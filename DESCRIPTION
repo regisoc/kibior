@@ -8,17 +8,17 @@ LazyData: true
 VignetteBuilder: knitr
 RoxygenNote: 7.1.0.9000
 biocViews: DataImport, DataRepresentation, ThirdPartyClient
-URL: https://
-BugReports: https://
-Title: a simple and lightweight Kibio and Elasticsearch client for R
+URL: https://github.com/regisoc/kibior
+BugReports: https://github.com/regisoc/kibior/issues
+Title: Simple and lightweight data manipulation and Elasticsearch client for R
 Authors@R:
     person(given = "Régis",
            family = "Ongaro-Carcy",
            role = c("aut", "cre"),
            email = "regis.ongaro-carcy2@crchudequebec.ulaval.ca",
            comment = c(ORCID = "0000-0002-0091-8810"))
-Description: an interface to store, search and share datasets with 
-    collaborators, based on Kibio- and Elasticsearch-related API, to 
+Description: Kibior is an interface to store, search, join and share datasets 
+    with collaborators, based on Kibio- and Elasticsearch-related API, to 
     handle massive data.
 Depends:
     R (>= 3.6)

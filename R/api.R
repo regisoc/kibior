@@ -29,7 +29,7 @@
 #'
 #' @name kibior
 #' 
-#' @title KibioR, an Kibio and Elasticsearch data manaipulation package.
+#' @title KibioR, an Kibio and Elasticsearch data manipulation package.
 #' 
 #' @description KibioR is a lightweight package for data manipulation 
 #'  with Elasticsearch. Its main features allow easy data import, export,
@@ -1311,11 +1311,18 @@ Kibior <- R6Class(
         #'
         #' @examples
         #' kc$list()
+        #' kc$list(get_specials = TRUE)
+        #'
+        #' @param get_special a boolean to get special indices (default: FALSE).
         #'
         #' @return a list of index names, NULL if no index found
         #'
-        list = function(){
+        list = function(get_specials = FALSE){
             r <- names(self$get_mappings())
+            if(!get_specials){
+                # remove special indices
+                r <- r[!startsWith(r, ".")]
+            }
             if(self$quiet_results) invisible(r) else r
         },
 
