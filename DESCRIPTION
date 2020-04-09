@@ -1,0 +1,44 @@
+Type: Package
+Date: 2020-01-13
+Package: kibior
+Version: 0.1.0
+License: Apache License (>= 2.0)
+Encoding: UTF-8
+LazyData: true
+VignetteBuilder: knitr
+RoxygenNote: 7.1.0.9000
+biocViews: DataImport, DataRepresentation, ThirdPartyClient
+URL: https://
+BugReports: https://
+Title: a simple and lightweight Kibio and Elasticsearch client for R
+Authors@R:
+    person(given = "Régis",
+           family = "Ongaro-Carcy",
+           role = c("aut", "cre"),
+           email = "regis.ongaro-carcy2@crchudequebec.ulaval.ca",
+           comment = c(ORCID = "0000-0002-0091-8810"))
+Description: an interface to store, search and share datasets with 
+    collaborators, based on Kibio- and Elasticsearch-related API, to 
+    handle massive data.
+Depends:
+    R (>= 3.6)
+Imports:
+    R6 (>= 2.4.1),
+    data.table (>= 1.12.8),
+    magrittr (>= 1.5),
+    crul (>= 0.9.0),
+    dplyr (>= 0.8.5),
+    stringr (>= 1.4.0),
+    purrr (>= 0.3.3),
+    elastic (>= 1.1.0),
+    jsonlite (>= 1.6.1),
+    rio (>= 0.5.16),
+    tools (>= 3.6.1)
+Suggests:
+    BiocManager,
+    ggplot2,
+    xml2 (>= 1.2.5),
+    yaml,
+    testthat (>= 2.3.2),
+    rmarkdown,
+    knitr (>= 1.28)

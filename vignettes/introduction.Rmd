@@ -1,0 +1,1286 @@
+---
+title: "KibioR - Introduction"
+author:
+- affiliation: CHU de Québec Research Center, Université Laval, Molecular Medicine
+    department, Québec, QC, Canada
+  email: regis.ongaro-carcy2@crchudequebec.ulaval.ca
+  name: Régis Ongaro-Carcy
+date: "`r Sys.Date()`"
+output:
+  rmarkdown::html_document:
+    highlight: tango
+    number_sections: yes
+    theme: cosmo
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+#   rmarkdown::html_notebook:
+#     highlight: tango
+#     number_sections: yes
+#     theme: cosmo
+#     toc: yes
+#     toc_depth: 3
+#     toc_float: yes
+#   BiocStyle::html_document: default
+vignette: >
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteIndexEntry{kibior_introduction}  
+  %\VignetteEncoding{UTF-8}
+
+---
+
+```{r setup, include = TRUE, echo = FALSE, results = FALSE, message = FALSE, warning = FALSE}
+library(knitr)
+knitr::opts_chunk$set(include = TRUE, 
+                      echo = TRUE, 
+                      warning = FALSE, 
+                      message = FALSE, 
+                      results = "markup", 
+                      collapse = TRUE,
+                      cache = FALSE,
+                      comment = "##")
+library(ggplot2)
+library(dplyr)
+library(stringr)
+library(readr)
+library(kibior)
+```
+
+<center>
+![](./img/logo_kibio_r_text.png){ width=100% }
+</center>
+<br/>
+
+Welcome to `Kibior` package introduction vignette!
+
+# General notions
+
+As one of the hot topics in science, being able to make findable, accessible, interoperable and researchable our datasets ([FAIR principles]()) brings openness, versionning and unlocks experiences reproductibility. To support that, great projects such as [biomaRt R package]() enable fast consumption and ease handling of massive validated data through a small interface. 
+
+Even though main entities such as Ensembl or NBCI avail massive amounts of data, they do not provide a way to *store* data elsewhere, delegating data handling to research teams. During data analysis, this can be an issue since researchers often need to send intermediary subsets of analyzed data to collaborators. Moreover, it is pretty common now that, when a new database or dataset emerges, a web platform and an API are provided alongside it, allowing easier exploration and querying respectively. 
+
+Multiplying the number of research teams in life-science worldwide with the ever-growing database and datasets publication on widely varying sub-fields results in an even greater number of ways to query heterogenous life-science data.
+
+Here, we present an easy way for `datasets manipulation and sharing throught decentralization`. Indeed, `Kibior` seeks to make available a search engine and distributed database system for sharing data easily through the use of [Elasticsearch (ES)](https://www.elastic.co/elasticsearch/) and Elasticsearch-based architectures such as [Kibio](http://kibio.science). 
+
+It is a way to handle large datasets and unlock the possibility to:
+
+- **pull/download datasets** from a local or remote instance of Elasticsearch,
+- **filter, query and search** in large amounts of data,
+- **push/store datasets** to local or remote instance of Elasticsearch,
+- **share datasets** for collaborators around the world,
+- **perform joins** between R in-memory and ES-based datasets,
+- **import and export datasets** from and to files,
+- **valid safe-state datasets** during pipeline execution,
+- **comply to FAIR-sharing requirements** by allowing REST requests on data and metadata from Elasticsearch API.
+
+
+<center>
+![](./img/kibior_principle.png){ width=100% }
+</center>
+
+
+## Vocabulary
+
+We will use *Elasticsearch vocabulary*, which is similar to R notions:
+
+| R                           | Elasticsearch       |
+|-----------------------------|---------------------|
+| data(set), tibble, df, etc. | index               |
+| columns, variables          | fields              |
+| lines, observations         | documents           |
+
+`Kibior` uses [tibbles](https://tibble.tidyverse.org/) as main data representation.
+
+
+## Demonstration datasets
+
+Before going to the second separate vignette showing `biological datasets example`, we strongly advise the reader to start reading the [`basic`](#basic-usage) and [`advanced`](#advanced-usage) usage sections. In these sections, we will use some datasets taken from other known packages, such as `dplyr::starwars`...
+
+```{r, echo = FALSE, results = "markup"}
+dplyr::starwars[1:5,]
+```
+
+...`dplyr::storms`...
+
+```{r, echo = FALSE, results = "markup"}
+dplyr::storms[1:5,]
+```
+
+...`datasets::iris`...
+
+```{r, echo = FALSE, results = "markup"}
+datasets::iris[1:5,]
+```
+
+...and `ggplot2::diamonds` to show our examples.
+
+```{r, echo = FALSE, results = "markup"}
+ggplot2::diamonds[1:5,]
+```
+
+# Vignettes build requirements
+
+> In order to build properly `Kibior vignettes`, you **MUST** have a running and accessible Elasticsearch instance.
+> See next section ([Deploy a single local Elasticsearch instance](#deploy-docker)) will help you deploy a local instance.
+
+The `kc` instance declared in the following R-code section is based on the previously mentionned configuration and will be used in all examples.
+If you already have configured Elasticsearch instances, change the next `$new()` call to match your own configuration.
+
+
+```{r init-kibior-instance}
+#> ------------------------------------------------------------
+#>                            /!\ 
+#> Change this declaration for a custom Elasticsearch instance
+#> You MUST HAVE a running and accessible Elasticsearch instance.
+#>                            /!\ 
+#> ------------------------------------------------------------
+
+#> here, the variable "kc" is an Kibior object 
+#> with the following initialization values:
+#>    host = "elasticsearch"
+#>    port = 9200
+#>    user = NULL
+#>    pwd = NULL
+#>    verbose = FALSE
+#> which will bind "kc" to the instance named "docker-cluster"
+kc <- Kibior$new(host = "elasticsearch")
+kc
+```
+
+> The default `login/password` for Elasticsearch is `elastic/changeme`
+
+For the sake of readability, we will use **kc** as the generic name for our *example instance of `Kibior`*.
+
+
+```{r hidden-config, echo = FALSE, results = FALSE, message = FALSE, warning = FALSE}
+#> preparing data for the vignette
+
+#> quiet progress bar
+kc$quiet_progress <- TRUE
+kc$verbose <- FALSE
+
+#> remove unwanted from Elasticsearch
+delete_if_exists <- function(index_name){
+    if(kc$has(index_name)) kc$delete(index_name)
+}
+delete_if_exists("sw")
+delete_if_exists("iris")
+delete_if_exists("starwars")
+delete_if_exists("starwars_alderaan")
+delete_if_exists("starwars_naboo")
+delete_if_exists("starwars_tatooine")
+delete_if_exists("storms")
+delete_if_exists("diamonds")
+delete_if_exists("storm_with_our_id")
+delete_if_exists("storms_file")
+delete_if_exists("storms_file_moved")
+delete_if_exists("storms_zeta_moved")
+dplyr::storms %>% 
+    dplyr::select(name) %>% 
+    unique() %>% 
+    as.list() %>% 
+    .$name %>% 
+    tolower() %>%
+    paste0("storms_", .) %>% 
+    lapply(delete_if_exists)
+```
+
+
+
+# Deploying an Elasticsearch instance {#deploy-docker}
+
+Before starting, you should know that this step will *start an Elasticsearch service and store all data on your machine*.
+
+So, you should ponder the quantity of data you will handle in your code according the remaining space left on your computer.
+
+
+## Installation with Docker and docker-compose
+
+To use this feature, you will need `Docker` and `docker-compose` installed on your system.
+
+To install `Docker`, simply follow [the steps detailled on its website](https://docs.docker.com/install/).
+
+If you are on a Linux / Unix-based system, you should also check the [post-installation steps](https://docs.docker.com/install/linux/linux-postinstall/), mainly for the *Manage Docker as a non-root user* step.
+
+To install `docker-compose`, simply follow [the next steps](https://docs.docker.com/compose/install/).
+
+
+## Run your own Elasticsearch instance
+
+The following is the docker-compose fashion. You can use the `docker` way by passing parameters, but it is verbose and not really needed here since we want something simple to use.
+
+Copy-paste these lines inside a "`single-es.yml`" file.
+
+```yml
+# "single-es.yml" file
+version: '3.7'
+
+services:
+
+  elasticsearch:
+    # this configuration will run a service called "elasticsearch"
+    container_name: elasticsearch
+
+    # the elasticsearch image used will be version 7.5.1
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.5.1
+
+    # defines env var
+    # last line tells us java will use 512MB
+    # if you need more, change it for 2GB, for instance
+    # "ES_JAVA_OPTS=-Xms2g -Xmx2g"
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+
+    # lock memory
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+
+    # export port to access Elasticsearch service from outside docker
+    ports:
+      - 9200:9200
+```
+
+Now, run the configuration to launch the service with:
+
+```
+docker-compose -f /your/path/to/single-es.yml up -d
+```
+
+The Elasticsearch service will be accessible. Check `http://localhost:9200`. 
+You can test it on any browser, it will print out something like that:
+
+<center>
+![elasticsearch-docker-launched](./img/elasticsearch_single_node.png)
+</center>
+
+Once done, you can now use this instance as your own data repository with `Kibior` and R:
+
+```r
+#> Initiate a remote connection
+kc_remote <- Kibior$new(host = "something-far", user = "foo", pwd = "bar")
+
+#> Create an new local instance bound to your local Elasticsearch
+#> By default, Kibior uses localhost isntance with 9200 port
+kc_local <- Kibior$new()
+
+#> you may need to authenticate since Elasticsearch uses auth system
+#> the default login/password is "elastic"/"changeme", so
+kc_local <- Kibior$new(user = "elastic", pwd = "changeme")
+```
+
+You can now use `kc_local` as your own private instance.
+
+
+## Stop the Elasticsearch service
+
+To stop the service, simply enter the command:
+
+```
+docker-compose -f /your/path/to/single-es.yml down
+```
+
+
+# Vignettes menu {#vignette-menu}
+
+This vignette is organized as a simple tutorial with some examples you can follow to get the base of how `Kibior` works:
+
+- [`Basic usage`](#basic-usage), shows the main methods and simple examples how to use them.
+- [`Advanced usage`](#advanced-usage), details the `Kibior` object and methods specificities, such as attributes and querying syntax.
+
+The last part is the second vignette, illustrating a more biologically-oriented use case with `Kibior`.
+
+
+# Basic usage {#basic-usage}
+
+Here, we will see the main methods (`push()`, `pull()`, `list()`, `get_fields()`, `has()`, `export()`, `import()`, `move()`, `copy()`) and public attributes (verbosity) of `Kibior` class.
+
+
+## Verbosity attributes
+
+By default, `Kibior` comes with three public attributes: `$verbose`, `$quiet_progress` and `$quiet_results` all initiliazed to `FALSE`. 
+
+- `$verbose` toggles the printing of more informations which can be useful to see all processes steps. Use `kc$verbose <- TRUE` to activate verbose mode.
+- `$quiet_progress` toggles the printing of progress bars for `$push()` and `$pull()` methods: the printing is on by default, but can be shut off simply with `kcprogress_quiet <- TRUE`. This can be useful for scripts.
+- `$quiet_results` toggles the verbosity output of Kibior methods. It is `FALSE` by default which means methods will print out result. You may want to deactivate it when you do not need interactive feedback.
+
+A new instance of `Kibior` have default progress bar printing for pull/push actions, but no additional informations.
+
+See [`Attribute access`](#attribute-access) in `Advanced usage` section for all attribute descriptions.
+
+
+## Store a dataset to Elasticsearch: *$push()*
+
+To store data using `kc` connection:
+
+```{r push}
+s <- kc$push(dplyr::storms, "storms")
+```
+
+If not already taken, the given index name will be created automatically before receiving data. If already taken, an error is raised. 
+
+> Important points: 
+> 1. `$push()` automatically send data to Elasticsearch server, which *needs* unique IDs.
+>    If not defined, unique IDs are generated by Elasticsearch (default). 
+>    One can define its own IDs using the `id_col` parameter which requires a column name that has unique elements.
+> 2. `$push()` expects well-formatted data, mainly in a dataframe or derivative structure such as tibble.
+
+See [`Push modes`](#push-modes) in `Advanced usage` section for more information.
+
+
+## Download a dataset from Elasticsearch: *$pull()*
+
+The `$pull()` method results in a **list of tibbles**.
+
+```{r pull}
+s <- kc$pull("storms")
+s %>% names() %>% print()
+```
+
+```{r pull-table}
+s$storms
+```
+
+This is because we can use *search pattern* to return multiple indices at once.
+
+See [`Pattern search`](#pattern-search) in `Advanced usage` section for more information.
+
+
+
+## List all Elasticsearch indices: *$list()*
+
+```{r list-indices}
+#> list all indices
+kc$list() %>% print()
+```
+
+
+## List all fields of an Elasticsearch index: *$get_fields()*
+
+```{r list-fields}
+#> list all fields
+kc$get_fields("storms") %>% print()
+```
+
+
+## Test if an Elasticsearch index exists: *$has()*
+
+```{r has}
+#> test presence of an index
+kc$has("storms")
+kc$has("abcde")
+```
+
+If multiple index names are given, `$has()` will test if **all are present**.
+
+```{r has-multiple}
+#> test presence of all indices
+c("storms", "abcde") %>% kc$has()
+```
+
+
+## Extract Elasticsearch index content to a file: *$export()*
+
+```{r hidden-prepare-export, echo = FALSE, results = FALSE, message = FALSE, warning = FALSE}
+#> preparing data for exporting
+delete_if_exists("storms")
+kc$push(dplyr::storms, "storms")
+```
+
+The `$export()` method create file and export `in-memory dataset` or `Elasticsearch index` to this file.
+
+```{r export}
+#> Create temp files with data
+storms_memory_tmp <- tempfile(fileext=".csv")
+storms_elastic_tmp <- tempfile(fileext=".csv")
+
+#> export a in-memory dataset to a file
+kc$export(data = dplyr::storms, filepath = storms_memory_tmp)
+rio::import(storms_memory_tmp) %>% dplyr::as_tibble()
+
+#> export an Elasticsearch index to a file
+kc$export(data = "storms", filepath = storms_elastic_tmp)
+rio::import(storms_elastic_tmp) %>% dplyr::as_tibble()
+```
+
+This method can also automatically use `zip` by adding the file extension.
+
+```{r export-zip}
+#> file with zip extension
+storms_memory_zip <- tempfile(fileext=".csv.zip")
+#> export it
+kc$export(dplyr::storms, storms_memory_zip)
+```
+
+Note: `Kibior` is using `rio` package that can export much more formats. 
+See [rio documentation](https://github.com/leeper/rio#supported-file-formats) and `rio::install_formats()` function.
+
+
+## Get a file content to a new Elasticsearch index: *$import()*
+
+The `$import()` method can duplicate a dataset retrieved from a file to a `in-memory variable` or `a new Elasticsearch index`.
+
+```{r import}
+#> import data from file
+data_from_file <- kc$import(filepath = storms_memory_tmp)
+data_from_file
+```
+
+```{r import-with-duplicate}
+#> import data from file and send it to a new 
+#> Elasticsearch index, with default configuration
+data_from_file <- kc$import(filepath = storms_memory_tmp, 
+                            import_mode = "both", 
+                            push_index = "storms_file", 
+                            push_mode = "check")
+kc$list() %>% print()
+data_from_file
+```
+
+As `$export()`, it can also read directly from `zipped` files.
+
+```{r import-with-duplicate-zip}
+#> import data from file and send it to a new 
+#> Elasticsearch index, with default configuration
+data_from_file <- kc$import(storms_memory_zip)
+data_from_file
+```
+
+Note: `Kibior` is using `rio` package that can export much more formats. 
+See [rio documentation](https://github.com/leeper/rio#supported-file-formats) and `rio::install_formats()` function.
+
+
+## Rename an index: *$move()*
+
+The `$move()` method rename an index. The `$copy()` method is equivalent to `$move(copy = TRUE)`.
+
+```{r move}
+#> move a existing dataset to another index
+s <- kc$move(from_index = "storms_file", to_index = "storms_file_moved")
+s <- kc$list()
+s
+```
+
+## Copy an index: *$copy()*
+
+The `$copy()` method copy an index to another name. It is a wrapper around `$move(copy = TRUE)`.
+
+```{r copy}
+#> copy index
+s <- kc$copy(from_index = "storms_file_moved", to_index = "storms_file")
+s <- kc$list()
+s
+```
+
+
+## Delete an Elasticsearch index: *$delete()*
+
+The `$delete()` method deletes one or more indices.
+
+```{r delete}
+#> delete one or multiple indices
+c("storms_file", "storms_file_moved") %>% kc$delete()
+```
+
+It can also delete following a pattern.
+
+```{r delete-pattern}
+#> push some subsets with the same prefix
+s <- dplyr::storms %>% filter(name == "Amy") %>% kc$push("storms_amy")
+s <- dplyr::storms %>% filter(name == "Doris") %>% kc$push("storms_doris")
+s <- dplyr::storms %>% filter(name == "Bess") %>% kc$push("storms_bess")
+s <- kc$list()
+s
+#> delete following a pattern
+kc$delete("storms_*")
+s <- kc$list()
+s
+```
+
+
+## Search everything: *$search()*
+
+Elasticsearch is here... *You know, For search*. As a search engine, it is its main feature.
+
+Using `$search()` method, you can search for everything inside a part or all data indexed by Elasticsearch.
+If no restrictions is found in the `query` parameter, all data will be searched, which means in *every indices, every fields, every keywords*.
+
+```{r search, message = TRUE, results = "hold"}
+#> here, we search the exact string "something" everywhere
+#> but will find nothing
+kc$search(query = "something")
+```
+
+```{r search-good, message = TRUE}
+#> we search for the exact string "anita" in "storms" dataset
+s <- kc$search("storms", query = "anita")
+s %>% names() %>% print()
+s$storms
+```
+
+```{r search-partial, message = TRUE}
+#> we search for text containing the substring "an" in "storms" dataset
+s <- kc$pull("storms", query = "*am*")$storms
+#> we get 4 storms names
+s %>% select(name) %>%  unique()
+```
+
+By default, `$search()` has **head mode active**, which will return a small subset (default is `5`) of the actual complete result to allow quick inspection of data.
+With `$verbose <- TRUE`, it will be printed in the result as "**Head mode: on**". To change the head size, modify the `$head_search_size` attribute.
+
+To get the full result, you have to use `$search(head = FALSE)`, or more simply : `$pull()`.
+
+See [`Querying`](#querying) in `Advanced usage` section for more information.
+
+
+# Advanced usage {#advanced-usage}
+
+## Pattern search {#pattern-search}
+
+Some methods allow **wildcard** use "*" such as `$search()` and `$pull()`.
+
+```{r pattern-init}
+#> consider these two datasets
+s <- kc$push(dplyr::starwars, "starwars")
+s <- kc$push(dplyr::storms, "storms", mode = "recreate")
+
+#> we want to search all indices startings with an "s" 
+#> we search for words in the "name" field that start with a "d"
+s <- kc$search("s*", query = "name:d*", head = FALSE)
+s %>% names() %>% print()
+s$starwars
+s$storms
+```
+
+
+## Attributes access {#attribute-access}
+
+As objects, *Kibior* instances attributes can be accessed and updated for some. 
+
+
+| Attribute name                | Read-only | Default         | Target                                                                                    |
+|-------------------------------|-----------|-----------------|-------------------------------------------------------------------------------------------|
+| $host                         |           | "localhost"     | the Elasticsearch host                                                                    |
+| $port                         |           | 9200            | the Elasticsearch port                                                                    |
+| $user                         | x         | NULL            | the Elasticsearch user                                                                    |
+| $pwd                          | x         | NULL            | the Elasticsearch password                                                                |
+| $connection                   | x         | NULL            | the Elasticsearch connection object                                                       |
+| $head_search_size             |           | 5               | the head size default value                                                               |
+| $cluster_name                 | x         | When connected  | the cluster name if and only if already connected                                         |
+| $cluster_status               | x         | When connected  | the cluster status if and only if already connected                                       |
+| $nb_documents                 | x         | When connected  | the current cluster total number of documents if already connected                        |
+| $version                      | x         | When connected  | the Elasticsearch version if and only if already connected                                |
+| $elastic_wait                 |           | 2               | the Elasticsearch wait time for update commands if already connected (in seconds)         |
+| $valid_joins                  | x         | A vector        | the valid joins available in Kibior                                                       |
+| $valid_count_types            | x         | A vector        | the valid count types available (mainly observations = rows, variables = columns)         |
+| $valid_elastic_metadata_types | x         | A vector        | the valid Elasticsearch metadata types available                                          |
+| $valid_push_modes             | x         | A vector        | the valid push modes available                                                            |
+| $valid_import_modes           | x         | A vector        | the valid import modes available                                                          |
+| $shard_number                 |           | 1               | the number of allocated primary shards when creating an Elasticsearch index               |
+| $shard_replicas_number        |           | 1               | the number of allocated replicas in an Elasticsearch index                                |
+| $default_id_col               |           | "kid"           | the ID column name used when sending data to Elasticsearch if not provided by user        |
+| $verbose                      |           | FALSE           | the verbose mode                                                                          |
+| $quiet_progress               |           | FALSE           | the progress bar printing mode                                                            |
+| $quiet_results                |           | FALSE           | the method results printing mode                                                          |
+
+```{r attributes-demo}
+#> access the current host for the "kc" instance
+kc$host %>% print()
+#> modify the head_search threshold
+kc$head_search_size <- 10L
+```
+
+Some attributes cannot be modified.
+
+```{r, eval = FALSE}
+#> error when trying to modify read-only attributes
+kc$user <- "nope"
+```
+
+
+## Organizing data for searches
+
+Working alone directly on a massive cluster of servers is an unlikely situation. 
+Moreover, handling large datasets on your own computer or storing all data in your local Elasticsearch repository is generally a bad idea.
+We generally tend to only handle what we can afford to, and organize pipelines and softwares accordingly.
+
+There are multiple strategies to organize data, and our main objective here is to use servers for what they have been built for: to do the cpu- and memory-greedy job so in comparison, our tiny computers will not have to do it. Putting `Kibior` in this equation will help us further because it is backed by a `database and search engine`.
+
+As a rule of thumb, `subsetting and querying` is a good strategy, e.g. splitting on `categorial variables`.
+
+```{r organize-init}
+#> push storms dataset
+kc$push(dplyr::storms, "storms", mode = "recreate")
+#> select the first 5 storms names and push them
+#> in different indices, each name prefixed with "storms_"
+dplyr::storms %>% 
+    split(dplyr::storms$name) %>% 
+    head() %>% 
+    purrr::imap(function(data, index_name){ 
+        index_name %>% 
+            tolower() %>% 
+            paste0("storms_", .) %>%
+            kc$push(data, .) 
+    })
+kc$list() %>% print()
+```
+
+What we can do then, is searching in all indices names starting with the prefix "`storms_`"
+
+```{r organize-search}
+#> Within them, we search some minimum winds and pressure
+#> results come already filtered by storm names
+kc$search("storms_*", 
+        query = "wind:>25 && pressure:>30", 
+        fields = c("name", "year", "month", "lat", "long", "status"), 
+        head = FALSE)
+```
+
+As we show before, we did not push all data but only some subsets of interest. 
+By selecting and pushing what we need, datasets can be `searched and shared immediately after`.
+
+If you `work in sync with multiple remote collaborators` on the same Elasticsearch cluster, that can be a great strategy. 
+For instance, one of your collaborators can add a new dataset that will not change the request, but will enrich the result.
+
+```{r organize-sync}
+#> added from remote kibior instance 
+#> using `tail()` to simulate other data
+dplyr::storms %>% 
+    split(dplyr::storms$name) %>% 
+    tail(2) %>% 
+    purrr::imap(function(data, index_name){ 
+        index_name %>% 
+            tolower() %>% 
+            paste0("storms_", .) %>%
+            kc$push(data, .) 
+    })
+```
+
+We can apply the same request and found some new results.
+
+```{r organize-sync-search}
+#> search all, same request as before
+s <- kc$search("storms_*", 
+            query = "wind:>25 && pressure:>30", 
+            fields = c("name", "year", "month", "lat", "long", "status"), 
+            head = FALSE)
+#> assemble results if needed
+do.call(rbind, s)
+```
+
+
+## Querying {#querying}
+
+One of the main features of *Kibior* is to be able to **search** inside vast amounts of data thanks to Elasticsearch.
+You can use the search feature with the eponym method `$search()` but also `$pull()` by using the `query` parameter.
+
+### Querying notation
+
+To query specific data, *Kibior* `query` parameter of `$pull()` and `$search()` methods requires one string following the [Elasticsearch Query String Syntax](https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html#query-string-syntax).
+
+To sum them up, you can search for:
+
+- `terms`,
+
+```{r term-search}
+kc$search("starwars", query = "orange")$starwars
+```
+
+- or `phrases`, with **double-quotes**.
+
+```{r phrase-search}
+kc$search("starwars", query = '"Luke Skywalker"')$starwars
+```
+
+To complement, you can apply multiple operators:
+  
+- `boolean operators`: 
+  - **AND** (or "**&&**", double-ampersand), 
+  - **OR** (or "**||**", double-pipe), 
+  - **NOT** (or "**!**", exclamation point), 
+  - **+**: the term MUST be present,
+  - **-**: the term MUST NOT be present.
+
+- `grouping`: organize boolean operators, ex: "`(quick OR brown) AND fox`".
+
+- `field selecting`: target a specific field.
+  - Phrases can be searched.
+
+```{r search-field-phrase}
+#> rows that have "name" == "Luke Skywalker" 
+kc$search("starwars", query = 'name:"Luke Skywalker"')$starwars
+```
+
+  - Boolean operators can be used.
+
+```{r search-field-boolean}
+#> rows that have blue or green eyes
+kc$search("starwars", query = 'eye_color:(blue OR green)')$starwars
+```
+
+- `range notation`: using **[min TO max]** for inclusive or **{min TO max}** for exclusive.
+  - Can be use as a simple search expression for one side unbounded: 
+    - `n:>=10` is equivalent to `n:[10 TO *]`.
+    - `n:<=10` is equivalent to `n:[* TO 10]`.
+    - `n:>10` is equivalent to `n:{10 TO *}`.
+    - `n:<10` is equivalent to `n:{* TO 10}`.
+  - Inclusive threshold.
+
+```{r search-range-include}
+#> include 160 and 180 values
+s <- kc$search("starwars", query = "height:[160 TO 180]")$starwars
+s
+```
+
+  - Exclusive threshold.
+
+```{r search-range-exclude}
+#> exclude 160 and 180 values
+s <- kc$search("starwars", query = "height:{160 TO 180}")$starwars
+s
+```
+
+  - Mixing inclusive and exclusive.
+
+```{r search-range-semi}
+#> exclude 160 but include 180
+s <- kc$search("starwars", query = "height:{160 TO 180]")$starwars
+s
+```
+
+- `fuzzyness and proximity`: using "**~**" at the end of a term to use approximative search.
+  - Default fuzzy factor is 2, meaning "`quikc~`" and "`quikc~2`" are identical.
+  - It can be applied to phrases, ex: "`"fox quick"~5`".
+
+```{r search-fuzzy}
+#> fuzzy search for blue/black/brown/... eyes
+#> useful when we do not know exactly the content
+s <- kc$search("starwars", query = "eye_color:bla~3")$starwars
+s
+```
+
+- `boosting`: using "**^**" ponderate some expressions over others.
+  - Value:
+    - O to 1: decrease boosting.
+    - Superior to 1: increase boosting.
+  - Boost type:
+    - `terms`, ex: `quick^2 fox`, quick is boosted.
+    - `phrases`, ex: `"foo bar"^2`.
+    - `groups`, ex: `(foo bar)^4`.
+
+```{r search-boost}
+#> boost the black eye search but get the blue too
+s <- kc$search("starwars", query = "eye_color:(black^2 OR blue)")$starwars
+s
+```
+
+Now, we can considering making easily a more complex search query:
+
+```{r search-complex}
+#> consider these datasets
+s <- kc$push(ggplot2::diamonds, "diamonds")
+
+#> searching premium or ideal quality of diamonds, 
+#> with a price inferior to 10k$, a carat superior to 1.4,
+#> a z between 2.2 and 5.4 included, and not colors E or H. 
+#> we only want some fields.
+s <- kc$search("diamonds", 
+               query = "cut:(premium || ideal) 
+                  && price:<10000 
+                  && carat:>1.4 
+                  && z:[2.2 TO 5.4] 
+                  && -color:(E || H)", 
+               fields = c("carat", "color", "depth", "clarity", "price", "z"), 
+               head = FALSE)
+s$diamonds
+```
+
+### `$search()` behavior
+
+Though Elasticsearch is very powerful as a document-oriented database, it is a **full-text search engine**.
+
+```{r search-exact-match}
+#> searching for exact word "dar" but nothing found
+kc$search(query = "dar")
+```
+
+With wildcard and targeting a single index:
+
+```{r search-case}
+#> The search is case-insensitive meaning: 
+#> Dar == dAr == daR == DAr == ...etc.
+kc$search(query = "*Dar*")$starwars
+```
+
+Fields selection:
+
+```{r search-text-fields}
+#> searching every word in name that starts with "d"
+s <- kc$search(query = "name:d*", 
+               fields = c("name", "status"))
+s %>% names() %>% print()
+#> Empty
+s$diamonds 
+#> some names, but no status field found
+s$starwars
+#> complete fields
+s$storms
+```
+
+As you can see on the last request, some fields did not match, thus were not returned.
+
+Now a more complex search:
+
+```{r search-sumup}
+#> We can search premium or ideal quality of diamonds, 
+#> with a price inferior to 10k$, a carat superior to 1.4,
+#> a z between 2.2 and 5.4 included, not colors E or H,
+#> and not from a clarity starting with the string "VS"
+#> we only want some fields.
+s <- kc$search("diamonds", 
+               query = "cut:(premium || ideal) 
+                  && price:<10000 
+                  && carat:>1.4 
+                  && z:[2.2 TO 5.4] 
+                  && -color:(E || H)
+                  && -clarity:VS*", 
+               fields = c("carat", "color", "depth", "clarity", "price", "z"), 
+               head = FALSE)
+s$diamonds
+```
+
+This was executed on a small 54k observations and 10 variables dataset.
+We will see it on a bigger one in `biological example` vignette.
+
+### `text` and `keyword` querying {#text-querying}
+
+Lastly, we need to see the difference between a `keyword` and a `text` field.
+
+Elasticsearch can index text values as two different types: `text` and `keyword`. The difference between those two is that:
+
+- `text` fields such as "name" or "skin_color" are broken up into words during indexing, allowing searches on one or more words,
+
+```{r search-text-type}
+#> search every documents which have at least 
+#> a word in "name" fields starting with "L"
+kc$pull("starwars", 
+        query = "name:L*", 
+        fields = "name")$starwars
+```
+
+- `keyword` fields (always added when pushing data with *Kibior*) keep the full text as one string.
+
+```{r search-keyword-type}
+#> search every documents which have their "name"
+#> field starting with "L"
+kc$pull("starwars", 
+        query = "name.keyword:L*", 
+        fields = "name")$starwars
+```
+
+*Kibior* indexes all text values as `text` ***AND*** `keyword`, so we can use **whole-text search** (with `.keyword` tag) *AND* **word-specific** (without `.keyword` tag).
+
+Doing a search for a word starting with a specific prefix in pure R is a bit more annoying:
+
+```{r}
+s <- dplyr::starwars[["name"]] %>%                  #> take the name column data
+        lapply(function(x){                         #> for each name
+          stringr::str_split(x, " ") %>%            #> split name by space
+          unlist(use.names = FALSE) %>%             #> align
+          grepl("^L", ., ignore.case = TRUE) %>%    #> search pattern for words starting with "L", ignore case to search also for "^l"
+          any()                                     #> TRUE if at least one word match
+        }) %>%                                      #> list of logicals
+        unlist(use.names = FALSE) %>%               #> flatten it to logical vector to match starwars observations number
+        dplyr::starwars[.,] %>%                     #> apply logical filter only on lines that were found
+        dplyr::select(name)                         #> select only "name" var
+s
+```
+
+
+
+## Push details
+
+### Define a unique IDs column
+
+When pushing data with default parameters, Elasticsearch will define unique IDs for each record (each line of a table) and add them as *metadata*.
+You can retrieve them by using `$pull(keep_metadata = TRUE)`.
+
+```{r pull-metadata}
+#> With the storms index
+kc$pull("storms", keep_metadata = TRUE)$storms
+```
+
+*Metadata fields* are mainly prefixed by an underscore. The actual record is embedded into the `_source` field.
+Since data have been pushed without specifying an ID column, the `_id` field that defines Elasticsearch unique IDs reflects the one automatically added by *Kibior* in the data (`kid` by default). To change the default ID column added by *Kibior*, change the `$default_id_col` attribute value.
+
+Letting *Kibior* handle ID attribution will produce uniqueness, but might not be the most meaningful and practical for update.
+
+To change that behavior, you can define your own ID field when calling `$push()` data by using the `id_col` parameter.
+
+```{r push-custom-idcolumn}
+#> Again, pushing storms, but with our own IDs, for instance, 
+#> by adding "aaa" at the begining of each row number and use it as ID.
+data <- storms
+ids <- seq_len(nrow(data)) %>% 
+  paste("aaa", ., sep="")
+data <- cbind(a_new_unique_id = ids, data)
+#> the column "a_new_unique_id" will be used as our unique ID
+s <- kc$push(data, "storm_with_our_id", id_col = "a_new_unique_id")
+#> and see 
+s <- kc$pull("storm_with_our_id", 
+             fields = "a_new_unique_id",
+             keep_metadata = TRUE)$storm_with_our_id
+s %>% select(c("_id", "_source.a_new_unique_id"))
+```
+
+Caution here: the `fields` parameter does not apply to metadata.
+
+```{r pull-metadata-fields}
+#> fields match nothing except actual pushed data fields
+kc$pull("storms", keep_metadata = TRUE, fields = c("_id", "_version"))$storms
+```
+
+
+### Push modes {#push-modes}
+
+When pushing data, if the index you are using in `$push()` already exists, an error will be thrown.
+This is due to `mode = "check"` parameter that will check if an index with the name you gave already exists.
+This is the default option, but can be changed to `"recreate"` or `"update"`:
+
+- `"recreate"` will erase the index and write to a fresh one with the same name. Be cautious with this option as you will erase previously written data from that index name.
+
+```{r push-recreate}
+#> recreate one index, whether it already exists or no
+s <- kc$push(dplyr::starwars, "starwars", mode = "recreate")
+kc$has("starwars")
+```
+
+- `"update"` will push and update indexed data with corresponding IDs. For this option, you must know which field is the unique ID and send updated documents over them. You do not need all data to be updated, just send a subset of updated data. Send all data again might be error prone and can take a lot of time if your dataset is big. Knowing which field is the unique ID also helps a lot and prevent errors. 
+
+```{r push-update}
+#> we will change the height of orange-eyed inhabitants of "Naboo"
+#> homeworld to 300 and update that subset to the main one.
+s <- kc$pull("starwars", 
+             query = "eye_color:orange && homeworld:naboo")$starwars
+s
+
+#> change the height
+s$height <- 300
+s
+
+#> and update the main dataset. Since it is 
+#> a subset of that dataset, IDs are the same.
+ns <- kc$push(s, "starwars", 
+              mode = "update", 
+              id_col = "kid")
+#> see the result
+ns <- kc$pull("starwars", 
+              query = "eye_color:orange && homeworld:naboo")$starwars
+ns
+```
+
+## `select()` and `filter()`.
+
+`dplyr` package offers simple and effective functions called **filter** and **select** to quickly reduce the scope of interest.
+In the same fashion, Kibior uses *Elasticsearch query string syntax* that is very similar to the **dplyr** syntax (see [Querying](#querying) section). 
+Elasticsearch decuple the search possibilities by allowing similar usage on multiple indices, or datasets.
+
+Moreover, using `$search()` or `$pull()`, one can use their analogous features:
+
+- `dplyr::select()` with `field` and `query` parameter,
+- and `dplyr::filter()` with `query` parameter.
+
+Using both of them result in much more powerful search capabilities in a much more readable code.
+
+Following sections are some examples of analogous requests.
+
+### Similarities
+
+Select some fields:
+
+```{r}
+#> Tidyverse 
+s <- dplyr::starwars %>% 
+        dplyr::select(name, height, homeworld)
+
+#> Kibior
+s <- kc$pull("starwars", 
+             fields = c("name", "height", "homeworld"))
+```
+
+Filter on strict thresholds:
+
+```{r}
+#> Tidyverse 
+s <- dplyr::starwars %>% 
+        dplyr::filter(height > 180)
+
+#> Kibior
+s <- kc$pull("starwars", 
+             query = "height:>180")
+```
+
+Filter on soft thresholds:
+
+```{r}
+#> Tidyverse 
+s <- dplyr::starwars %>% 
+        dplyr::filter(height >= 180)
+
+#> Kibior
+s <- kc$pull("starwars", 
+             query = "height:>=180")
+#> or with range notation
+s <- kc$pull("starwars", 
+             query = "height:[180 TO *]")
+```
+
+Filter on ranges:
+
+```{r}
+#> Tidyverse 
+s <- dplyr::starwars %>% 
+        dplyr::filter(height >= 180 && height <= 300)
+
+#> Kibior
+s <- kc$pull("starwars", 
+             query = "height:[180 TO 300]")
+```
+
+Filter on exact string match for one field:
+
+```{r}
+#> Tidyverse 
+s <- dplyr::starwars %>% 
+        dplyr::filter(homeworld == "Naboo")
+
+#> Kibior
+s <- kc$pull("starwars", 
+             query = "homeworld:Naboo")
+```
+
+Filter on exact string match with multiple choices on one field:
+
+```{r}
+#> Tidyverse 
+s <- dplyr::starwars %>% 
+        dplyr::filter(homeworld == "Naboo" | homeworld == "Tatooine")
+#> or
+s <- dplyr::starwars %>% 
+        dplyr::filter(homeworld %in% c("Naboo", "Tatooine"))
+
+#> Kibior (several ways to do it)
+s <- kc$pull("starwars", 
+             query = "homeworld:(Naboo || Tatooine)")
+```
+
+Filter on partial string matching:
+
+```{r}
+#> Tidyverse, we have to use `str_detect`
+s <- dplyr::starwars %>% 
+        dplyr::filter(str_detect(name, "Luk|Dar"))
+
+#> Kibior, nothing else required
+s <- kc$pull("starwars", 
+             query = "name:(*Luk* | *Dar*)")
+```
+
+Filter over a compositions of multiple filters (multiple fields):
+
+```{r}
+#> Tidyverse 
+s <- dplyr::starwars %>% 
+        dplyr::filter(homeworld == "Naboo" && height > 180)
+
+#> Kibior
+s <- kc$pull("starwars", 
+             query = "homeworld:Naboo && height:>180")
+```
+
+
+### Differences
+
+Even if there are lots of similarities regarding the syntax, Elasticsearch is powerful search engine.
+Thus, `requests on billions of records` are less expensive to do with it.
+Also, Elasticsearch is accessible throught an its API. Numerous people can access it at the same time.
+Which mean you can `work synchronously with a collaborator` pushing data and using them immediately after.
+Moreover, using wildcards, we can `search on multiple indices at once`.
+
+What we can do very easily with Elasticsearch is searching everywhere: in every indices, in every fields, and in every words.
+Lastly, `full-text searches` are the big deal. See [Text and Keyword querying](#text-querying) for more details.
+
+
+## Change tibble column type
+
+*Kibior* will return base types in tibble structures (integer, character, logical, and list) for representing data.
+If you want to change some columns, use `readr::type_convert()` after retrieving the dataset.
+
+```{r change-columns-type}
+#> changing the "status" column from string to factor
+kc$pull("storms")$storms %>%
+    readr::type_convert(
+        col_types = readr::cols(
+            status = readr::col_factor()))
+```
+
+## Compare two instances
+
+If you manage multiple instances, you can compare host:port couple easily with `== and != operators`.
+
+```{r, eval = FALSE}
+#> is kc instance equal to kc_two instance?
+(kc == kc_two)
+#> are kc and kc_two instances differents?
+(kc != kc_two)
+```
+
+
+## Attach one instance to global environment
+
+Using only one instance of *Kibior*, you might want to `attach` this instance to the global environment. 
+This will indeed remove the instance call at the beginning of each method call (in our examples: `kc$...`). 
+
+Thought it can be practical in local developments for only one instance, we **strongly discourage that pratice if you entend to share your code**. 
+It can induce wrong behaviors during execution in environments with different configurations or multiple instances.
+
+
+## Joins
+
+**Kibior** integrated `dplyr package` joins: `full`, `left`, `right`, `inner`, `anti`, and `semi` joins.
+
+By using Kibior joins, you can apply these joins to `in-memory datasets` ***AND*** `Elasticsearch-based indices`.
+Kibior supports query parameter when joining to accelerate data retrival time nut *cannot join on listed fields*.
+
+```{r joins}
+#> pushing a subset of data
+dplyr::starwars %>% 
+    dplyr::filter(homeworld == "Naboo") %>%
+    kc$push("starwars_naboo", mode = "recreate")
+kc$pull("starwars_naboo")
+
+#> perform an inner join  between the in-memory full dataset
+#> and the remote subset we have just sent
+fields <- c("name", "height", "mass", "gender", "homeworld")
+kc$inner_join(left_index = dplyr::starwars, 
+            left_fields = fields,
+            right_index = "starwars_naboo",
+            right_fields = fields,
+            join_fields = c("name", "height", "mass"))
+```
+
+
+## Moving and copying data from another instance
+
+Appart from moving and copying indices from the same cluster of Elasticsearch instances, the `$move()` and `$copy()` methods can do the same with **REMOTE** instances.
+The remote Elasticsearch endpoint has to be declared inside your `elasticsearch.yml` configuration file. 
+
+By simply adding one line to the `elasticsearch.yml` configuration file, Elasticsearch servers can talk to ech others and send data between them.
+Then, the cluster has to be reboot to update configuration.
+
+
+```yml
+#> config/elasticsearch.yml
+
+...
+reindex.remote.whitelist: "otherhost:9200, another:9200, 127.0.10.*:9200, localhost:*"
+...
+
+```
+
+Full description can be found on [Elasticsearch documentation](https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-reindex.html#reindex-from-remote).
+
+After that, *Kibior* will be able to use the `from_instance` parameter of `$move()` and `$copy()`.
+
+```{r move-remote, eval = FALSE}
+#> init two ES binding
+#> kc_local must be configured
+#> we make the assumption that both kc are accessible
+kc_local <- Kibior$new("es_local")
+kc_remote <- Kibior$new("es_remote", port = 9205)
+#> copy data from kc_remote to kc_local
+kc_local$copy(from_instance = kc_remote, 
+              from_index = "remote_index", 
+              to_index = "new_copy_of_remote_index_in_local")
+```
+
+This method allows `massive data copying in a much faster` way since all data are structured the same.
+
+
+# Known limits
+
+- Elasticsearch *cannot store uppercase field names*, thus `all column names are forced to lowercase` when submitted by default.
+
+- Elasticsearch interprets *dots in strings as nested values* (ex: "aaa.bbb" is understand as field "aaa" containing a field "bbb"), which is prone to errors with R language since variables can be named with dots. To avoid errors when pushing data to Elasticsearch, `dots in column names are replaced by underscores`. 
+
+```r
+#> example with iris dataset
+datasets::iris %>% dplyr::as_tibble() %T>% kc$push("iris")
+kc$get_fields("iris")
+```
+
+- Elasticsearch has updatable *default limitations to 1000 fields/columns*, so if datasets pushed with more than 1000 variables, it will generate an error. Two solutions: `try to transpose it`, or define a higher Elasticsearch `limit in its configurations`.
+
+- Elasticsearch handles each document (each line of a table) with a unique ID: a specific "_id" metadata field. What can be confusing here is that metadata are not on the same level as data in Elasticsearch. To be able to update data more easily by targeting accurately document IDs, we force add a new unique field (default is `kid`) when pushing data to Elasticsearch and define it as the unique "_id" field. If you know one of your column is unique and can be used as an ID column, you can use the `id_col` of the `$push()` method to define this column as main ID.
+
+- The `fields` parameter of `$pull()` method does not handle the metadata fields.
+
+- Elasticsearch is really great for textual and keyword search, for that the text has to have common delimiters to be cut down to words. Passing a single, billions-long, uninterrupted biomolecular sequence is not a good thing for Elasticsearch and result in a indexing failure.
+
+
+
+# Tested with
+
+`Kibior` has been tested with these configurations:
+
+
+| Software        | Version             | Build                 | Date          |
+|-----------------|---------------------|-----------------------|---------------|
+| `Elasticsearch` | 7.5.1               |                       | 2019-12-18    |
+| `R`             | 3.6.1               |                       | 2019-07-05    |
+| `RStudio`       | Version 1.2.5001    | Build 93, 7b3fe265    | 2019-09-18    |
+
+
+
+# References
+
+`Kibior` uses two CRAN packages, also available on Github: 
+
+- [`elastic`](https://github.com/ropensci/elastic/), a wrapper of Elasticsearch API by [ROpenSci](https://ropensci.org/),
+
+> Scott Chamberlain (2020). 
+>
+> *elastic: General Purpose Interface to 'Elasticsearch'.*
+>
+> [elastic website](https://docs.ropensci.org/elastic) and [github repository](https://github.com/ropensci/elastic).
+
+- and, [`rio`](https://github.com/leeper/rio) an very useful import/export library.
+
+> Chung-hong Chan, Geoffrey CH Chan, Thomas J. Leeper, and Jason Becker (2018). 
+>
+> *rio: A Swiss-army knife for data file I/O.* 
+>
+> [rio github repository](https://github.com/leeper/rio)
+
+# Session info
+
+<details>
+    <summary>Session info</summary>
+
+    <p>
+
+    \```{r}
+    sessionInfo()
+    \```
+
+    </p>
+</details>  
+
+
+*Sharing is caring.*
+
+
