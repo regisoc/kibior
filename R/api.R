@@ -1319,7 +1319,7 @@ Kibior <- R6Class(
         #'
         list = function(get_specials = FALSE){
             r <- names(self$get_mappings())
-            if(!get_specials){
+            if(!purrr::is_null(r) && !get_specials){
                 # remove special indices
                 r <- r[!startsWith(r, ".")]
             }
@@ -1401,7 +1401,7 @@ Kibior <- R6Class(
         #' @return a list of statistics about the cluster
         #'
         stats = function(){
-            r <- elastic::cluster_stats(kc$connection)
+            r <- elastic::cluster_stats(self$connection)
             if(self$quiet_results) invisible(r) else r
         },
 
@@ -1449,9 +1449,16 @@ Kibior <- R6Class(
             if(purrr::is_null(index_name)) index_name <- "_all"
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name", can_be_null = TRUE))
             res <- NULL
-            m <- elastic::index_get(self$connection, 
-                                    index = index_name, 
-                                    verbose = self$verbose)
+            m <- tryCatch(
+                {
+                    r <- suppressWarnings(elastic::index_get(self$connection, 
+                                    index = index_name,
+                                    include_type_name = FALSE, 
+                                    verbose = self$verbose))
+                }, 
+                warning = function(w){},    # do nothing, just capture the warning
+                finally = { r }             # return the result, warnings or not
+            )
             if(length(m) > 0){
                 res <- m
             }
@@ -1556,7 +1563,7 @@ Kibior <- R6Class(
                         elastic::count(self$connection, index = i, q = query)
                     },
                     "variables" = {
-                        self$fields(i) %>% length()
+                        self$fields(i)[[i]] %>% length()
                     },
                     stop(private$ERR_WTF, " Found type: ", type)
                 )
@@ -1592,8 +1599,8 @@ Kibior <- R6Class(
             res <- p %>% 
                 purrr::imap(function(x, y){ 
                     c(
-                        kc$count(x, type = "observations")[[x]], 
-                        kc$count(x, type = "variables")[[x]]
+                        self$count(x, type = "observations")[[x]], 
+                        self$count(x, type = "variables")[[x]]
                     )
                 })
             if(self$quiet_results) invisible(res) else res
@@ -1619,11 +1626,20 @@ Kibior <- R6Class(
             #
             res <- list()
             tmp <- self$get_mappings(index_name = index_name)
+            get_property_names <- function(node, index_name){
+                # try index name
+                r <- node[[index_name]]$properties %>% names()
+                # if main node is empty, maybe in "_doc"
+                if(purrr::is_null(r)){ 
+                    r <- node[["_doc"]]$properties %>% names()
+                }
+                r
+            }
             for(i in names(tmp)){
-                if(self$version$major > 5){
-                    res[[i]] <- tmp[[i]]$properties %>% names()
+                if(self$version$major > 6){
+                    res[[i]] <- get_property_names(tmp, i)
                 } else {
-                    res[[i]] <- tmp[[i]][[i]]$properties %>% names()
+                    res[[i]] <- get_property_names(tmp[[i]], i)
                 }
             }
             if(length(res) == 0){
@@ -1659,12 +1675,32 @@ Kibior <- R6Class(
             if(private$is_search_pattern(index_name)) stop(private$err_search_pattern_forbidden("index_name"))
             if(!purrr::is_character(field_name)) stop(private$err_param_type_character("field_name"))
             if(length(field_name) > 1) stop(private$err_one_value("field_name"))
-            if(!(field_name %in% kc$fields(index_name)[[index_name]])) stop(private$err_field_unknown(index_name, field_name))
+            if(!(field_name %in% self$fields(index_name)[[index_name]])) stop(private$err_field_unknown(index_name, field_name))
+            
             #
-            kc$pull(index_name, fields = field_name) %>%
-                .[[index_name]] %>% 
-                .[[field_name]] %>%
-                unique()
+            # self$pull(index_name, fields = field_name) %>%
+            #     .[[index_name]] %>% 
+            #     .[[field_name]] %>%
+            #     unique()
+
+
+            body = list(
+                "size" = 0, 
+                "aggs" = list(
+                    "kaggs" = list(
+                        "terms" = list(
+                            "field" = paste0(field_name, ".keyword")
+                        )
+                    )
+                )
+            )
+            r <- elastic::Search(self$connection, 
+                                index_name = index_name, 
+                                size = 0, 
+                                body = body)
+            r$aggregations$kaggs$buckets %>% 
+                lapply(function(x){ x$key }) %>% 
+                unlist()
         },
 
 
@@ -1702,7 +1738,7 @@ Kibior <- R6Class(
                 }) %>% 
                 do.call(data.frame, .)
             names(bam_df) <- bam_field
-            dplyr::as_tibble(bam_df)
+            dplyr::as_tibble(bam_df, .name_repair = "unique")
         },
 
 
@@ -1777,7 +1813,10 @@ Kibior <- R6Class(
             # do import
             rio::import(file = filepath) %>% 
                 (function(table){
-                    if(to_tibble) dplyr::as_tibble(table) else table
+                    if(to_tibble){
+                        table <- dplyr::as_tibble(table, .name_repair = "unique")
+                    }
+                    table
                 })
         },
 
@@ -1810,7 +1849,10 @@ Kibior <- R6Class(
             Kibior$.install_packages("rtracklayer")
             rtracklayer::import(filepath) %>% 
                 (function(features){
-                    if(to_tibble) dplyr::as_tibble(features) else features
+                    if(to_tibble){
+                        table <- dplyr::as_tibble(table, .name_repair = "unique")
+                    }
+                    table
                 })
         },
 
@@ -1883,15 +1925,20 @@ Kibior <- R6Class(
                 dna_method <- Biostrings::readDNAStringSet
                 rna_method <- Biostrings::readRNAStringSet
                 aa_method <- Biostrings::readAAStringSet
+                # file exists?
+                if(!file.exists(filepath)){
+                    f <- tempfile()
+                    download.file(filepath, f)
+                } else {
+                    f <- filepath
+                }
                 # select mode
-                fasta_method <- switch(fasta_type,
-                    "dna"   = { dna_method },
-                    "rna"   = { rna_method },
-                    "aa"    = { aa_method },
-                    "auto"  = function(fasta_file){
+                r <- switch(fasta_type,
+                    "dna"   = { dna_method(f) },
+                    "rna"   = { rna_method(f) },
+                    "aa"    = { aa_method(f) },
+                    "auto"  = function(){
                         if(self$verbose) message("  Auto-mode [on]")
-                        f <- tempfile()
-                        download.file(fasta_file, f)
                         tryCatch({
                                 # try dna
                                 if(self$verbose) message("  - Try [DNA] parsing...")
@@ -1911,9 +1958,6 @@ Kibior <- R6Class(
                                             },
                                             warning = function(eee){
                                                 stop("Cannot apply 'Biostrings' to filepath.")
-                                            },
-                                            finally = {
-                                                unlink(f)
                                             }
                                         )
                                     }
@@ -1923,25 +1967,25 @@ Kibior <- R6Class(
                     },
                     stop("Unknown fasta option '", fasta_type, "'.")
                 )
-                r <- fasta_method(filepath)
+                # tibble
                 if(to_tibble){
                     r <- r %>%
                         string_set_to_df() %>% 
-                        dplyr::as_tibble()
+                        dplyr::as_tibble(.name_repair = "unique")
                 }
                 r
 
-            } else {
-                # run fastq
-                Kibior$.install_packages("ShortRead")
-                f <- tempfile()
-                download.file(filepath, destfile = f)
-                r <- ShortRead::readFastq(f)
-                unlink(f)
-                if(to_tibble){
-                    if(self$verbose) message("Argument `to_tibble` not taken into accoutn fo fastq data.")
-                }
-                r
+            # } else {
+            #     # run fastq
+            #     Kibior$.install_packages("ShortRead")
+            #     f <- tempfile()
+            #     download.file(filepath, destfile = f)
+            #     r <- ShortRead::readFastq(f)
+            #     unlink(f)
+            #     if(to_tibble){
+            #         if(self$verbose) message("Argument `to_tibble` not taken into accoutn fo fastq data.")
+            #     }
+            #     r
             }
         },
 
@@ -2601,7 +2645,11 @@ Kibior <- R6Class(
             # init var
             selected_fields <- if(purrr::is_null(fields)) NULL else paste0(fields, collapse = ",")
             end_search <- FALSE
-            total_nb_rec <- search_res$hits$total$value
+            # check version
+            total_nb_rec <- search_res$hits$total
+            if(self$version$major > 6){
+                total_nb_rec <- total_nb_rec$value
+            }
             threshold <- if(purrr::is_null(max_size)) total_nb_rec else max_size
             # progress bar init
             pb_sum <- 0
