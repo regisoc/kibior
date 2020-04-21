@@ -28,8 +28,8 @@ warnings_are_errors: true
 git:
   depth: false
 
-apt_packages: 
-  - oracle-java8-set-default
+# apt_packages: 
+#   - oracle-java8-set-default
 
 # code coverage
 r_github_packages:
@@ -49,9 +49,9 @@ before_install:
 
 before_script:
   - sleep 15
-  - docker inspect $CID
   - docker ps -a
-  - curl -X GET "localhost:9200/_cluster/health?pretty"
+  - IPADDRESS=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $CID)
+  - curl -X GET "$IPADDRESS:9200/_cluster/health?pretty"
 
 after_success:
 - if [[ "${R_COV}" ]]; then Rscript -e 'covr::codecov()'; fi
