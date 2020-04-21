@@ -1,1 +1,76 @@
+
+#
 language: r
+cache: packages
+os: linux
+sudo: required
+
+r: 
+  - release
+  - devel
+  - bioc-release
+  - bioc-devel
+
+
+# warnings fail the build
+warnings_are_errors: true
+# pandoc: false
+
+git:
+  depth: false
+
+apt_packages: 
+  - oracle-java8-set-default
+
+# code coverage
+r_github_packages:
+  - r-lib/covr
+
+## DOCKER 
+
+services:
+  - docker
+
+
+## MATRIX
+
+# matrix:
+jobs:
+  include:
+    - name: ES 5.6.16
+      env:
+        - ES_VERSION=5.6.16 
+    - name: ES 6.8.8
+      env: 
+        - R_COV=true
+        - ES_VERSION=6.8.8
+    - name: ES 7.5.2
+      env: 
+        - R_COV=true
+        - ES_VERSION=7.5.2
+    - name: ES 7.6.2
+      env: 
+        - R_COV=true
+        - ES_VERSION=7.6.2
+
+
+## PROCESS
+
+before_install:
+  - docker --version
+  - docker pull docker.elastic.co/elasticsearch/elasticsearch:$ES_VERSION
+  - docker run -d -p 9200:9200 docker.elastic.co/elasticsearch/elasticsearch:$ES_VERSION
+  - sleep 5
+  - docker ps -a
+  - curl -X GET "localhost:9200"
+
+after_success:
+- if [[ "${R_COV}" ]]; then Rscript -e 'covr::codecov()'; fi
+
+
+## NOTIF
+
+notifications:
+  email:
+    on_success: never
+    # on_failure: never
