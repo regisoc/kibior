@@ -10,15 +10,15 @@ dist: bionic
 
 r: 
   - release
-  - devel
-  - bioc-release
-  - bioc-devel
+  # - devel
+  # - bioc-release
+  # - bioc-devel
 
 env:
   - ES_VERSION=5.6.16 
   - ES_VERSION=6.8.8 R_COV=true
-  - ES_VERSION=7.5.2 R_COV=true
-  - ES_VERSION=7.6.2 R_COV=true
+  # - ES_VERSION=7.5.2 R_COV=true
+  # - ES_VERSION=7.6.2 R_COV=true
 
 
 # warnings fail the build
@@ -29,7 +29,6 @@ git:
   depth: false
 
 apt_packages: 
-  - curl
   - oracle-java8-set-default
 
 # code coverage
@@ -46,10 +45,11 @@ services:
 before_install:
   - docker --version
   - docker pull docker.elastic.co/elasticsearch/elasticsearch:$ES_VERSION
-  - docker run -d -p 9200:9200 --name "elasticsearch" -e "discovery.type=single-node" -e "transport.host=127.0.0.1" -e "xpack.security.enabled=false" docker.elastic.co/elasticsearch/elasticsearch:$ES_VERSION
+  - CID=$(docker run -d -p 9200:9200 --name "es" -e "discovery.type=single-node" -e "transport.host=127.0.0.1" -e "xpack.security.enabled=false" docker.elastic.co/elasticsearch/elasticsearch:$ES_VERSION)
 
 before_script:
   - sleep 15
+  - docker inspect $CID
   - docker ps -a
   - curl -X GET "localhost:9200/_cluster/health?pretty"
 
