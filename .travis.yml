@@ -47,9 +47,11 @@ before_install:
   - docker --version
   - docker pull docker.elastic.co/elasticsearch/elasticsearch:$ES_VERSION
   - docker run -d -p 9200:9200 --name "elasticsearch" -e "discovery.type=single-node" -e "transport.host=127.0.0.1" -e "xpack.security.enabled=false" docker.elastic.co/elasticsearch/elasticsearch:$ES_VERSION
-  - sleep 5
+
+before_script:
+  - sleep 15
   - docker ps -a
-  - curl -X GET "0.0.0.0:9200/_cluster/health?pretty"
+  - curl -X GET "localhost:9200/_cluster/health?pretty"
 
 after_success:
 - if [[ "${R_COV}" ]]; then Rscript -e 'covr::codecov()'; fi
