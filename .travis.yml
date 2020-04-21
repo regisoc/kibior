@@ -29,6 +29,7 @@ git:
   depth: false
 
 apt_packages: 
+  - curl
   - oracle-java8-set-default
 
 # code coverage
@@ -45,10 +46,10 @@ services:
 before_install:
   - docker --version
   - docker pull docker.elastic.co/elasticsearch/elasticsearch:$ES_VERSION
-  - docker run -d -p 9200:9200 -e "discovery.type=single-node" docker.elastic.co/elasticsearch/elasticsearch:$ES_VERSION
+  - docker run -d -p 9200:9200 --name "elasticsearch" -e "discovery.type=single-node" -e "transport.host=127.0.0.1" -e "xpack.security.enabled=false" docker.elastic.co/elasticsearch/elasticsearch:$ES_VERSION
   - sleep 5
   - docker ps -a
-  - curl -X GET "127.0.0.1:9200"
+  - curl -X GET "elasticsearch:9200/_cluster/health?pretty"
 
 after_success:
 - if [[ "${R_COV}" ]]; then Rscript -e 'covr::codecov()'; fi
