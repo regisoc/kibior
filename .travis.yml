@@ -43,10 +43,15 @@ before_install:
 r_github_packages:
   - r-lib/covr
 
+# install call
+
 before_script:
-  - docker ps -a
   - IPADDRESS=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $CID)
   - curl -X GET "$IPADDRESS:9200/_cluster/health?pretty"
+  - 
+
+# script call
+# https://docs.travis-ci.com/user/languages/r/#customizing-the-travis-build-steps
 
 after_success:
 - if [[ "${R_COV}" ]]; then Rscript -e 'covr::codecov()'; fi
