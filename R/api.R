@@ -1549,8 +1549,8 @@ Kibior <- R6Class(
         count = function(index_name = NULL, type = "observations", query = NULL){
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
             if(!self$has(index_name)) stop(private$err_index_unknown(index_name))
-            if(!(type %in% private$.VALID_COUNT_TYPES)) stop(private$err_not_in_vector("Count type", private$.VALID_COUNT_TYPES))
             if(length(type) > 1) stop(private$err_one_value("type"))
+            if(!(type %in% private$.VALID_COUNT_TYPES)) stop(private$err_not_in_vector("Count type", private$.VALID_COUNT_TYPES))
             if(!purrr::is_null(query)){
                 if(!purrr::is_character(query)) stop(private$err_param_type_character("query"))
                 if(length(query) > 1) stop(private$err_one_value("query"))
@@ -1676,16 +1676,14 @@ Kibior <- R6Class(
             if(!purrr::is_character(field_name)) stop(private$err_param_type_character("field_name"))
             if(length(field_name) > 1) stop(private$err_one_value("field_name"))
             if(!(field_name %in% self$fields(index_name)[[index_name]])) stop(private$err_field_unknown(index_name, field_name))
-            
-            #
-            # self$pull(index_name, fields = field_name) %>%
-            #     .[[index_name]] %>% 
-            #     .[[field_name]] %>%
-            #     unique()
 
+            # TODO
+            # need to be changed to composite aggr.
+            # https://www.elastic.co/guide/en/elasticsearch/reference/6.8/search-aggregations-bucket-composite-aggregation.html
 
+            # request
             body = list(
-                "size" = 0, 
+                "size" = 0,
                 "aggs" = list(
                     "kaggs" = list(
                         "terms" = list(
@@ -1698,7 +1696,7 @@ Kibior <- R6Class(
                                 index_name = index_name, 
                                 size = 0, 
                                 body = body)
-            r$aggregations$kaggs$buckets %>% 
+                r$aggregations$kaggs$buckets %>% 
                 lapply(function(x){ x$key }) %>% 
                 unlist()
         },
@@ -2326,15 +2324,17 @@ Kibior <- R6Class(
         #'  list are index names matching the request, value are the associated tibbles
         #'
         pull = function(index_name = NULL, bulk_size = 1000, max_size = NULL, scroll_timer = "1m", keep_metadata = FALSE, fields = NULL, query = NULL) {
-            res <- self$search(index_name = index_name, 
-                            keep_metadata = keep_metadata, 
-                            fields = fields, 
-                            query = query, 
-                            bulk_size = bulk_size, 
-                            max_size = max_size, 
-                            scroll_timer = scroll_timer, 
-                            head = FALSE)
-            if(self$quiet_results) invisible(res) else res
+            args <- list(
+                index_name = index_name, 
+                keep_metadata = keep_metadata, 
+                fields = fields, 
+                query = query, 
+                bulk_size = bulk_size, 
+                max_size = max_size, 
+                scroll_timer = scroll_timer, 
+                head = FALSE
+            )
+            if(self$quiet_results) invisible(do.call(self$search, args)) else do.call(self$search, args)
         },
 
         # TODO test
@@ -2476,12 +2476,14 @@ Kibior <- R6Class(
         #' @return the reindex result
         #'
         copy = function(from_instance = NULL, from_index = NULL, to_index = NULL, force = FALSE){
-            res <- self$move(from_instance = from_instance, 
-                            from_index = from_index, 
-                            to_index = to_index, 
-                            force = force, 
-                            copy = TRUE)
-            if(self$quiet_results) invisible(res) else res
+            args <- list(
+                from_instance = from_instance, 
+                from_index = from_index, 
+                to_index = to_index, 
+                force = force, 
+                copy = TRUE
+            )
+            if(self$quiet_results) invisible(do.call(self$move, args)) else do.call(self$move, args)
         },
 
 
@@ -2552,7 +2554,7 @@ Kibior <- R6Class(
         #' @return a list of datasets corresponding to the pull request, else an error. Keys of the 
         #'  list are index names matching the request, value are the associated tibbles
         #'
-        search = function(index_name = "_all", keep_metadata = FALSE, fields = NULL,  bulk_size = 1000, max_size = NULL, scroll_timer = "1m", head = TRUE, query = NULL){
+        search = function(index_name = "_all", keep_metadata = FALSE, fields = NULL,  bulk_size = 500, max_size = NULL, scroll_timer = "1m", head = TRUE, query = NULL){
             if(purrr::is_null(index_name)) index_name <- "_all"
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
             if(!is.numeric(bulk_size)) stop(private$err_param_type_numeric("bulk_size"))
@@ -2580,11 +2582,25 @@ Kibior <- R6Class(
             # define when to stop the search with head mode
             if(self$verbose) {
                 message("Head mode: ", if(head) "on" else "off" , "")
-                if(head) message("Head size: ", self$head_search_size, ".")
+                if(head) message("Head size: ", self$head_search_size)
             }
-            terminate_after <- if(head) self$head_search_size else NULL
+            # terminate_after <- if(head) self$head_search_size else NULL
             # return result
             final_df <- list()
+            # init
+            selected_fields <- if(purrr::is_null(fields)) NULL else paste0(fields, collapse = ",")
+            end_search <- FALSE
+
+            # # escape string for ES
+            # # https://stackoverflow.com/a/14838753
+            # escape_elastic_reserved_characters <- function(s){
+            #     stringr::str_replace_all(s, "(\\W)", "\\\\\\1")
+            # }
+            
+            # total according to ES version
+            get_total_records <- function(hits_total){
+                if(self$version$major > 6) hits_total$value else hits_total
+            }
             # function: get clean bulk
             get_clean_bulk <- function(bulk){
                 "Clean bulks when they arrive"
@@ -2632,27 +2648,20 @@ Kibior <- R6Class(
             search_res <- elastic::Search(self$connection, 
                                         index = index_name, 
                                         size = bulk_size, 
-                                        "_source" = "_id", 
+                                        source = selected_fields,
                                         time_scroll = scroll_timer, 
-                                        q = query, 
-                                        terminate_after = terminate_after)
-            # no results
+                                        q = query)
+            # check total hits
+            total_nb_rec <- get_total_records(search_res$hits$total)
+            if(self$verbose) message("Total hits: ", total_nb_rec)
             search_hits <- length(search_res$hits$hits)
-            if(search_hits == 0){
-                final_df[[index_name]] <- search_hits
-                return(final_df)
-            }
-            # init var
-            selected_fields <- if(purrr::is_null(fields)) NULL else paste0(fields, collapse = ",")
-            end_search <- FALSE
-            # check version
-            total_nb_rec <- search_res$hits$total
-            if(self$version$major > 6){
-                total_nb_rec <- total_nb_rec$value
-            }
+            # no results
+            if(search_hits == 0) return(NULL)
+            # max threshold
             threshold <- if(purrr::is_null(max_size)) total_nb_rec else max_size
             # progress bar init
             pb_sum <- 0
+            pb <- NULL
             if(!head && !self$quiet_progress){
                 pb <- txtProgressBar(min = 0, max = threshold, initial = 0, style = 3)
             }
@@ -2667,24 +2676,32 @@ Kibior <- R6Class(
             # loop until nothing is returned or threshold is reached
             clock_start <- proc.time()
             while(!end_search){
+
                 # organize documents by list(index name = vector of ids)
-                search_by_index <- list()
+                ids_by_index <- list()
                 for(h in search_res$hits$hits){
-                    search_by_index[[ h[["_index"]] ]] <- c(search_by_index[[ h[["_index"]] ]], h[["_id"]])
+                    cindex <- h[["_index"]]
+                    cid <- h[["_id"]]
+                    if(cid != ""){
+                        ids_by_index[[cindex]] <- c(ids_by_index[[cindex]], cid)
+                    }
                 }
-                # nb_hits by rounds
+                
+                # init nb_hits by rounds
                 nb_hits <- 0
+                
                 # for each index
-                for(current_index in names(search_by_index)){
-                    # search list of index/type/id
-                    if(length(search_by_index[[current_index]]) == 1) {
+                for(current_index in names(ids_by_index)){
+
+                    # search list of ids
+                    if(length(ids_by_index[[current_index]]) == 1) {
                         # complete args
                         args <- c(base_args, list(
                             index = current_index,
-                            id = search_by_index[[current_index]], 
+                            id = ids_by_index[[current_index]], 
                             source_includes = selected_fields
                         ))
-                        # get data from ES
+                        # get data from ES (simple get)
                         raw <- do.call(elastic::docs_get, args) %>%
                             jsonlite::fromJSON(simplifyDataFrame = TRUE) %>%
                             (function(x){ 
@@ -2698,10 +2715,11 @@ Kibior <- R6Class(
                         final_df[[ current_index ]] <- raw
                         
                     } else {
+                        req_ids <- if(head) head(ids_by_index[[current_index]], self$head_search_size) else ids_by_index[[current_index]]
                         # complete args
                         args <- c(base_args, list(
                             index = current_index,
-                            ids = search_by_index[[current_index]], 
+                            ids = req_ids, 
                             "_source_includes" = selected_fields
                         ))
                         # get data from ES
@@ -2720,6 +2738,7 @@ Kibior <- R6Class(
                             }
                         }
                     }
+                    
                     # track progress and test end
                     if(head){
                         end_search <- TRUE
