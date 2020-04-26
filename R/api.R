@@ -1401,7 +1401,9 @@ Kibior <- R6Class(
         #' @return a list of statistics about the cluster
         #'
         stats = function(){
-            r <- elastic::cluster_stats(self$connection)
+            suppressMessages({ 
+                r <- elastic::cluster_stats(self$connection) 
+            })
             if(self$quiet_results) invisible(r) else r
         },
 
@@ -2645,15 +2647,43 @@ Kibior <- R6Class(
                 data
             }
             ## first search
-            search_res <- elastic::Search(self$connection, 
-                                        index = index_name, 
-                                        size = bulk_size, 
-                                        source = selected_fields,
-                                        time_scroll = scroll_timer, 
-                                        q = query)
+            # User query can be extremely huge, which can bring an:
+            # "Error: 400 - An HTTP line is larger than 4096 bytes.""
+            search_res <- tryCatch({
+                    elastic::Search(
+                        self$connection, 
+                        index = index_name, 
+                        size = bulk_size, 
+                        source = selected_fields, 
+                        time_scroll = scroll_timer, 
+                        q = query
+                    )
+                },
+                error = function(e){
+                    # pattern when limit of request size is reached
+                    r <- e$message %>% 
+                        trimws() %>%
+                        stringr::str_match("400 - An HTTP line is larger than ([0-9]+) bytes.") %>%
+                        .[1,2]
+                    if(!is.na(r)){
+                        msg <- paste0("Server '", self$cluster_name, "' (", self$host, ")")
+                        msg <- paste0(msg, " cannot take requests that big (max ", r," bytes).")
+                        msg <- paste0(msg, " Try cutting down your query into several pieces.")
+                    } else {
+                        msg <- e$message
+                    }
+                    stop(msg)
+                }
+            )
+
             # check total hits
             total_nb_rec <- get_total_records(search_res$hits$total)
-            if(self$verbose) message("Total hits: ", total_nb_rec)
+            if(self$verbose){
+                message("Total hits: ", total_nb_rec)
+                if(!purrr::is_null(max_size)){
+                    message("Max size asked: ", max_size)
+                }
+            }
             search_hits <- length(search_res$hits$hits)
             # no results
             if(search_hits == 0) return(NULL)
