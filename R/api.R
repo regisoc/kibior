@@ -2678,11 +2678,14 @@ Kibior <- R6Class(
             # involved_indices
             final_df <- get_involved_indices(index_name)
             if(self$verbose){
+                # 
                 final_df %>% 
                     names() %>% 
                     paste0(collapse = ", ") %>% 
                     paste0("Indices involved: ", .) %>%
                     message()
+                # first requests can be long, warn user
+                message("Elasticsearch is parsing requests...")
             }
             # various infos per index
             run_infos <- final_df
@@ -2805,8 +2808,13 @@ Kibior <- R6Class(
                 # each index
                 for(current_index in names(final_df)){
 
+                    # first search check
+                    if(length(run_infos[[current_index]][["hits"]]) == 0) {
+                        run_infos[[current_index]][["end_reached"]] <- TRUE
+                    }
+
                     # if end not reached for this index, explore
-                    if(!run_infos[[current_index]][["end_reached"]]){
+                    if(!run_infos[[current_index]][["end_reached"]]){    
 
                         # search list of ids
                         if(length(run_infos[[current_index]][["hits"]]) == 1) {
