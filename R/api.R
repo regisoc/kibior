@@ -2556,7 +2556,7 @@ Kibior <- R6Class(
         #' @return a list of datasets corresponding to the pull request, else an error. Keys of the 
         #'  list are index names matching the request, value are the associated tibbles
         #'
-        search = function(index_name = "_all", keep_metadata = FALSE, fields = NULL,  bulk_size = 500, max_size = NULL, scroll_timer = "1m", head = TRUE, query = NULL){
+        search = function(index_name = "_all", keep_metadata = FALSE, fields = NULL,  bulk_size = 500, max_size = NULL, scroll_timer = "3m", head = TRUE, query = NULL){
             if(purrr::is_null(index_name)) index_name <- "_all"
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
             if(!is.numeric(bulk_size)) stop(private$err_param_type_numeric("bulk_size"))
@@ -2567,6 +2567,7 @@ Kibior <- R6Class(
                 if(!is.numeric(max_size)) stop(private$err_param_type_numeric("max_size"))
                 if(length(max_size) > 1) stop(private$err_one_value("max_size"))
                 if(max_size < 1) stop(private$err_param_positive("max_size", can_be_null = FALSE))
+                if(bulk_size > max_size) stop("'bulk_size' > 'max_size' (", bulk_size, ">", max_size, ")")
                 max_size <- as.integer(max_size)
             }
             if(!purrr::is_character(scroll_timer)) stop(private$err_param_type_character("scroll_timer"))
@@ -2592,13 +2593,32 @@ Kibior <- R6Class(
             # init
             selected_fields <- if(purrr::is_null(fields)) NULL else paste0(fields, collapse = ",")
             end_search <- FALSE
-
             # # escape string for ES
             # # https://stackoverflow.com/a/14838753
             # escape_elastic_reserved_characters <- function(s){
             #     stringr::str_replace_all(s, "(\\W)", "\\\\\\1")
             # }
-            
+
+            # get involved indices in search
+            get_involved_indices <- function(req_indices){
+                # useless if all indices are named
+                if(!private$is_search_pattern(req_indices)){
+                    index_names_list <- req_indices
+                } else {
+                    # get indices
+                    index_names_list <- elastic::search_shards(
+                            conn = self$connection,
+                            index = req_indices
+                        ) %>% 
+                        .[["indices"]] %>% 
+                        names()
+                }
+                res <- list()
+                for(i in index_names_list){
+                    res[[i]] <- list()
+                }
+                res
+            }
             # total according to ES version
             get_total_records <- function(hits_total){
                 if(self$version$major > 6) hits_total$value else hits_total
@@ -2646,55 +2666,97 @@ Kibior <- R6Class(
                 }
                 data
             }
-            ## first search
-            # User query can be extremely huge, which can bring an:
-            # "Error: 400 - An HTTP line is larger than 4096 bytes.""
-            search_res <- tryCatch({
-                    elastic::Search(
-                        self$connection, 
-                        index = index_name, 
-                        size = bulk_size, 
-                        source = selected_fields, 
-                        time_scroll = scroll_timer, 
-                        q = query
-                    )
-                },
-                error = function(e){
-                    # pattern when limit of request size is reached
-                    r <- e$message %>% 
-                        trimws() %>%
-                        stringr::str_match("400 - An HTTP line is larger than ([0-9]+) bytes.") %>%
-                        .[1,2]
-                    if(!is.na(r)){
-                        msg <- paste0("Server '", self$cluster_name, "' (", self$host, ")")
-                        msg <- paste0(msg, " cannot take requests that big (max ", r," bytes).")
-                        msg <- paste0(msg, " Try cutting down your query into several pieces.")
-                    } else {
-                        msg <- e$message
-                    }
-                    stop(msg)
-                }
-            )
+            # extract ids
+            extract_ids <- function(hits){
+                hits %>% 
+                    lapply(function(h){ 
+                        h[["_id"]] 
+                    }) %>% 
+                    unlist(use.names = FALSE)
+            }
 
-            # check total hits
-            total_nb_rec <- get_total_records(search_res$hits$total)
+            # involved_indices
+            final_df <- get_involved_indices(index_name)
             if(self$verbose){
-                message("Total hits: ", total_nb_rec)
-                if(!purrr::is_null(max_size)){
-                    message("Max size asked: ", max_size)
+                final_df %>% 
+                    names() %>% 
+                    paste0(collapse = ", ") %>% 
+                    paste0("Indices involved: ", .) %>%
+                    message()
+            }
+            # various infos per index
+            run_infos <- final_df
+            for(i in names(run_infos)){
+                run_infos[[i]][["end_reached"]] <- FALSE
+                run_infos[[i]][["total_hits"]] <- NA
+                run_infos[[i]][["threshold"]] <- NA
+            }
+
+            # per index, first search config
+            for(current_index in names(run_infos)){
+
+                # first search, init scroll and manage error
+                search_res <- tryCatch({
+                        elastic::Search(
+                            self$connection, 
+                            index = current_index, 
+                            size = bulk_size, 
+                            source = "__",  # nullify _source
+                            time_scroll = scroll_timer, 
+                            q = query
+                        )
+                    },
+                    error = function(e){
+                        # pattern when limit of request size is reached
+                        r <- e$message %>% 
+                            trimws() %>%
+                            stringr::str_match("400 - An HTTP line is larger than ([0-9]+) bytes.") %>%
+                            .[1,2]
+                        if(!is.na(r)){
+                            msg <- paste0("Server '", self$cluster_name, "' (", self$host, ")")
+                            msg <- paste0(msg, " cannot take requests that big (max ", r," bytes).")
+                            msg <- paste0(msg, " Try cutting down your query into several pieces.")
+                        } else {
+                            msg <- e$message
+                        }
+                        stop(msg)
+                    }
+                )
+
+                if(self$verbose){
+                    message("- [", current_index, "]")
                 }
+                # check total hits
+                run_infos[[current_index]][["total_hits"]] <- get_total_records(search_res$hits$total)
+                if(self$verbose){
+                    message("   Total hits: ", run_infos[[current_index]][["total_hits"]])
+                }
+                # no results
+                if(length(search_res$hits$hits) == 0){
+                    run_infos[[current_index]][["end_reached"]] <- FALSE
+                }
+                
+                # max threshold
+                tmp_threshold <- if(purrr::is_null(max_size)) run_infos[[current_index]][["total_hits"]] else max_size
+                if(head && tmp_threshold > self$head_search_size){
+                    tmp_threshold <- self$head_search_size
+                } 
+                run_infos[[current_index]][["threshold"]] <- tmp_threshold
+                if(self$verbose){
+                    message("   Threshold: ", run_infos[[current_index]][["threshold"]])
+                }
+                
+                # scroll id
+                run_infos[[current_index]][["scroll_id"]] <- search_res[["_scroll_id"]]
+
+                # timer 
+                run_infos[[current_index]][["timer"]] <- 0
+
+                # last hits
+                run_infos[[current_index]][["hits"]] <- extract_ids(search_res$hits$hits)
             }
-            search_hits <- length(search_res$hits$hits)
-            # no results
-            if(search_hits == 0) return(NULL)
-            # max threshold
-            threshold <- if(purrr::is_null(max_size)) total_nb_rec else max_size
-            # progress bar init
-            pb_sum <- 0
-            pb <- NULL
-            if(!head && !self$quiet_progress){
-                pb <- txtProgressBar(min = 0, max = threshold, initial = 0, style = 3)
-            }
+
+
             # base args for inc loops
             base_args = list(
                 conn = self$connection, 
@@ -2703,112 +2765,173 @@ Kibior <- R6Class(
                 verbose = FALSE, 
                 callopts=list(verbose=FALSE)
             )
-            # loop until nothing is returned or threshold is reached
-            clock_start <- proc.time()
-            while(!end_search){
 
-                # organize documents by list(index name = vector of ids)
-                ids_by_index <- list()
-                for(h in search_res$hits$hits){
-                    cindex <- h[["_index"]]
-                    cid <- h[["_id"]]
-                    if(cid != ""){
-                        ids_by_index[[cindex]] <- c(ids_by_index[[cindex]], cid)
-                    }
-                }
-                
-                # init nb_hits by rounds
-                nb_hits <- 0
-                
-                # for each index
-                for(current_index in names(ids_by_index)){
-
-                    # search list of ids
-                    if(length(ids_by_index[[current_index]]) == 1) {
-                        # complete args
-                        args <- c(base_args, list(
-                            index = current_index,
-                            id = ids_by_index[[current_index]], 
-                            source_includes = selected_fields
-                        ))
-                        # get data from ES (simple get)
-                        raw <- do.call(elastic::docs_get, args) %>%
-                            jsonlite::fromJSON(simplifyDataFrame = TRUE) %>%
-                            (function(x){ 
-                                if(keep_metadata) unlist(x, recursive = FALSE) else x[["_source"]] 
-                            }) %>%
-                            rbind() %>% 
-                            as.data.frame() %>% 
-                            dplyr::as_tibble() %>%
-                            change_column_type()
-                        # combne results in one df
-                        final_df[[ current_index ]] <- raw
-                        
-                    } else {
-                        req_ids <- if(head) head(ids_by_index[[current_index]], self$head_search_size) else ids_by_index[[current_index]]
-                        # complete args
-                        args <- c(base_args, list(
-                            index = current_index,
-                            ids = req_ids, 
-                            "_source_includes" = selected_fields
-                        ))
-                        # get data from ES
-                        res <- do.call(elastic::docs_mget, args) %>% 
-                            jsonlite::fromJSON(simplifyDataFrame = TRUE)
-                        # if the result is not empty
-                        nb_hits <- nrow(res$docs)
-                        if(nb_hits > 0){
-                            # tidy data
-                            raw <- get_clean_bulk(res$docs)
-                            # combne results in one df
-                            if(length(final_df[[ current_index ]]) == 0){
-                                final_df[[ current_index ]] <- raw
-                            } else {
-                                final_df[[ current_index ]] <- rbind(raw, final_df[[ current_index ]])
-                            }
-                        }
-                    }
-                    
-                    # track progress and test end
-                    if(head){
-                        end_search <- TRUE
-                    } else {
-                        pb_sum <- pb_sum + nb_hits
-                        if(pb_sum > threshold){
-                            # force stop if max_size if reached
-                            end_search <- TRUE
-                            # select only the max_size first lines in final_df
-                            pb_sum <- threshold
-                            final_df[[ current_index ]] <- head(final_df[[ current_index ]], threshold)
-                        }
-                        if(!self$quiet_progress) setTxtProgressBar(pb, pb_sum)
-                    }
-                }
-                # continue search scroll
-                if(!end_search){
-                    search_res <- elastic::scroll(self$connection, 
-                                                search_res[["_scroll_id"]], 
-                                                time_scroll = scroll_timer)
-                    search_hits <- length(search_res$hits$hits)
-                    end_search <- (search_hits == 0)
-                }
-            } # --- END WHILE
-            message()
-            # Stop the clock
-            elapsed <- proc.time() - clock_start
-            # verbose
+            # verbose total hits info
             if(self$verbose){
-                # close scroll
-                if(!elastic::scroll_clear(self$connection, search_res[["_scroll_id"]])){
-                    message("Implicite scroll closing pending.")
+                cumul_total_hits <- run_infos %>% 
+                    lapply(function(x){ 
+                        x[["total_hits"]]
+                    }) %>% 
+                    unlist(use.names = FALSE) %>%
+                    sum()
+                message("Total hits: ", cumul_total_hits)
+                if(!head && !purrr::is_null(max_size)){
+                    message("Max size asked: ", max_size)
                 }
-                #
-                user_took <- {elapsed[["elapsed"]]* 1000} %>% private$humanize_mstime()
-                message("Execution time: ", user_took$time, user_took$unit)
+            }
+
+            # progress bar init
+            if(!head && !self$quiet_progress){
+                cumul_threshold <- run_infos %>% 
+                    lapply(function(x){ 
+                        if(x[["threshold"]] < x[["total_hits"]]) x[["threshold"]] else x[["total_hits"]]
+                    }) %>% 
+                    unlist(use.names = FALSE) %>%
+                    sum()
+                # init pbar
+                pb_sum <- 0
+                pb <- txtProgressBar(min = 0, max = cumul_threshold, initial = 0, style = 3)
+            }
+
+            # start timers
+            for(current_index in names(final_df)){
+                run_infos[[current_index]][["timer"]] <- proc.time()
+            }
+
+            # loop until nothing is returned or threshold is reached
+            all_end_search <- FALSE
+            while(!all_end_search){
+
+                # each index
+                for(current_index in names(final_df)){
+
+                    # if end not reached for this index, explore
+                    if(!run_infos[[current_index]][["end_reached"]]){
+
+                        # search list of ids
+                        if(length(run_infos[[current_index]][["hits"]]) == 1) {
+
+                            # complete args
+                            args <- c(base_args, list(
+                                index = current_index,
+                                id = run_infos[[current_index]][["hits"]],
+                                source_includes = selected_fields
+                            ))
+
+                            # get data from ES (simple get)
+                            raw <- do.call(elastic::docs_get, args) %>%
+                                jsonlite::fromJSON(simplifyDataFrame = TRUE) %>%
+                                (function(x){ 
+                                    if(keep_metadata) unlist(x, recursive = FALSE) else x[["_source"]] 
+                                }) %>%
+                                rbind() %>% 
+                                as.data.frame() %>% 
+                                dplyr::as_tibble() %>%
+                                change_column_type()
+                            
+                            # combne results in one df
+                            final_df[[ current_index ]] <- raw
+                            # end
+                            run_infos[[current_index]][["end_reached"]] <- TRUE
+                            #
+                            nb_hits <- 1
+
+                        } else {
+                            
+                            # ids to req
+                            if(head && length(run_infos[[current_index]][["hits"]]) > self$head_search_size){
+                                req_ids <- head(run_infos[[current_index]][["hits"]], self$head_search_size) 
+                            } else {
+                                req_ids <- run_infos[[current_index]][["hits"]]
+                            }
+
+                            # complete args
+                            args <- c(base_args, list(
+                                index = current_index,
+                                ids = req_ids,
+                                "_source_includes" = selected_fields
+                            ))
+
+                            # get data from ES
+                            res <- do.call(elastic::docs_mget, args) %>% 
+                                jsonlite::fromJSON(simplifyDataFrame = TRUE)
+                            
+                            # if the result is not empty
+                            nb_hits <- nrow(res$docs)
+                            if(nb_hits > 0){
+                                
+                                # tidy data
+                                raw <- get_clean_bulk(res$docs)
+
+                                # combne results in one df
+                                if(length(final_df[[ current_index ]]) == 0){
+                                    final_df[[ current_index ]] <- raw
+                                } else {
+                                    final_df[[ current_index ]] <- rbind(raw, final_df[[ current_index ]])
+                                }
+                            }
+
+                        }
+                        
+                        # update pbar
+                        if(!head && !self$quiet_progress){
+                            pb_sum <- pb_sum + nb_hits
+                            setTxtProgressBar(pb, pb_sum)
+                        }
+
+                        # test end
+                        if(nrow(final_df[[current_index]]) >= run_infos[[current_index]][["threshold"]]){
+                            run_infos[[current_index]][["end_reached"]] <- TRUE
+
+                        } else {
+                            # continue search scroll
+                            search_res <- elastic::scroll(self$connection, 
+                                                        run_infos[[current_index]][["scroll_id"]], 
+                                                        time_scroll = scroll_timer)
+
+                            tmp_ids <- extract_ids(search_res$hits$hits)
+                            run_infos[[current_index]][["hits"]] <- tmp_ids
+                            run_infos[[current_index]][["end_reached"]] <- (length(tmp_ids) == 0)
+                        }
+
+                    }
+
+                    # if end reached for this index
+                    if(run_infos[[current_index]][["end_reached"]]){
+                        # Stop the clock
+                        run_infos[[current_index]][["timer"]] <- proc.time() - run_infos[[current_index]][["timer"]]
+                        
+                    }
+                }
+
+                # test if all ends are set
+                all_end_search <- run_infos %>% 
+                    lapply(function(x){ x[["end_reached"]] }) %>%
+                    unlist(use.names = FALSE)  %>%
+                    all()
+            }
+
+            # verbose time
+            if(self$verbose){
+                message()
+                for(current_index in names(final_df)){
+                    # close scroll
+                    if(!elastic::scroll_clear(self$connection, run_infos[[current_index]][["scroll_id"]])){
+                        message("[", current_index, "] implicite scroll closing pending.")
+                    }
+                    #
+                    user_took <- { 
+                            run_infos[[current_index]][["timer"]][["elapsed"]] * 1000 
+                        } %>% 
+                        private$humanize_mstime()
+                    message("[", current_index, "] execution time: ", user_took$time, user_took$unit)
+
+                }
             }
 
             # close progress bar
             if(!head && !self$quiet_progress) close(pb)
+            # return 
             if(self$quiet_results) invisible(final_df) else final_df
         },
 
