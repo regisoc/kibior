@@ -208,37 +208,46 @@ Kibior <- R6Class(
         # methods - abstract & utils
         # --------------------------------------------------------------------------
 
-        join = function(join_type = NULL, left_index = NULL, left_fields = NULL, left_query = NULL, left_bulk_size = 1000, left_max_size = NULL, right_index = NULL, right_fields = NULL, right_query = NULL, right_bulk_size = 1000, right_max_size = NULL, join_fields = NULL, keep_metadata = FALSE) {
+        join = function(join_type = NULL, left_index, right_index, left_fields = NULL, left_query = NULL, left_bulk_size = 500, left_max_size = NULL, right_fields = NULL, right_query = NULL, right_bulk_size = 500, right_max_size = NULL, by = NULL, keep_metadata = FALSE) {
             "[Abstract method] Execute a join between two datasets using `dplyr` joins."
             "The datasets can be in-memory (variable name) or the name of an currently stored Elasticsearch index."
             "This should not be call directly. "
             "Use one of the (`$inner_join`, `$full_join`, `$left_join`, `$right_join`, `$anti_join` or `$semi_join`) public methods instead."
             ""
             "@param join_type the join type, defined by `private$.VALID_JOINS`. (default: NULL)"
-            "@param left_index the left index name or dataset. (default: NULL)"
+            "@param left_index the left index name or dataset."
+            "@param right_index the right index name or dataset."
             "@param left_fields the left index fields to select. (default: NULL)"
             "@param left_query the left index query. (default: NULL)"
-            "@param left_bulk_size the left index bulk size when downloading from Elasticsearch. (default: 1000)"
+            "@param left_bulk_size the left index bulk size when downloading from Elasticsearch. (default: 500)"
             "@param left_max_size the left index max size (hard threshold). (default: NULL)"
-            "@param right_index the right index name or dataset. (default: NULL)"
             "@param right_fields the right index fields to select. (default: NULL)"
             "@param right_query the right index query. (default: NULL)"
-            "@param right_bulk_size the right index bulk size when downloading from Elasticsearch. (default: 1000)"
+            "@param right_bulk_size the right index bulk size when downloading from Elasticsearch. (default: 500)"
             "@param right_max_size the right index max size (hard threshold). (default: NULL)"
-            "@param join_fields the field names used to join the two datasets. (default: NULL)"
+            "@param by the field names used to join the two datasets. Should be a named vector or list of this format c('field_left' = 'field_right') (default: NULL)"
             "@param keep_metadata Keep Elasticsearch metadata? (default: FALSE)"
             "@return the result of the called join"
 
             # TODO: add a "from_instance" param to join between instances
             
+            # missing ds/index names
+            if(missing(left_index)) stop("Missing left dataset/index name.")
+            if(missing(right_index)) stop("Missing right dataset/index name.")
             # join type
             if(!purrr::is_character(join_type)) stop(private$err_param_type_character("join_type"))
             if(!(join_type %in% private$.VALID_JOINS)) stop(private$err_not_in_vector("Join type", private$.VALID_JOINS))
+            # join
+            if(!purrr::is_null(by) && !purrr::is_character(by)) stop(private$err_param_type_character("by", can_be_null = TRUE))
+            if(purrr::is_character(by) && private$is_search_pattern(by)) stop(private$err_search_pattern_forbidden("by"))
+            # metadata
+            if(!purrr::is_logical(keep_metadata)) stop(private$err_param_type_logical("keep_metadata"))
+            if(is.na(keep_metadata)) stop(private$err_logical_na("keep_metadata"))
             # side args check (left and right)
             check_side_args <- function(side){
                 #
-                name_arg <- function(stype) paste0(side, "_", stype)
-                call_arg <- function(stype) { name_arg(stype) %>% parse(text = .) %>% eval() }
+                name_arg <- function(stype){ paste0(side, "_", stype) }
+                call_arg <- function(stype){ name_arg(stype) %>% parse(text = .) %>% eval() }
                 # names
                 n_index <- name_arg("index")
                 n_query <- name_arg("query")
@@ -265,6 +274,7 @@ Kibior <- R6Class(
                 } else {
                     # data from in-memory 
                     if(purrr::is_null(v_index)) stop(private$err_null_forbidden(n_index))
+                    if(!("data.frame" %in% class(v_index))) stop("Joining cannot be executed on '", n_index, "', need an index name, a data.frame or derivative.")
                     if(!purrr::is_null(v_query) && self$verbose) message("`", n_query, "` will be ignored.")
                 }
                 # bulk size
@@ -283,12 +293,6 @@ Kibior <- R6Class(
             # check right side
             check_side_args("right")
 
-            # join
-            if(purrr::is_character(join_fields) && private$is_search_pattern(join_fields)) {
-                stop(private$err_search_pattern_forbidden("join_fields"))
-            }
-            # metadata
-            if(is.na(keep_metadata)) stop(private$err_logical_na("keep_metadata"))
             #
             get_data <- function(index, fields, query, bulk_size, max_size){
                 "Function: get data from ES index or memory"
@@ -296,40 +300,67 @@ Kibior <- R6Class(
                 if(purrr::is_character(index)){
                     # if char, it is the index name needed to be pulled out
                     message("from index '", index, "'")
-                    index_data <- self$pull(index_name = index,
-                                            fields = fields,
-                                            query = query,
-                                            bulk_size = bulk_size,
-                                            max_size = max_size,
-                                            keep_metadata = keep_metadata)[[1]]
+                    index_data <- self$pull(
+                            index_name = index,
+                            fields = fields,
+                            query = query,
+                            bulk_size = bulk_size,
+                            max_size = max_size,
+                            keep_metadata = keep_metadata
+                        )[[index]]
+                    if(keep_metadata){
+                        # if keep metadata, remove "_source" prefix in colnames
+                        index_data <- index_data %>% 
+                            dplyr::rename_at(
+                                dplyr::vars(dplyr::starts_with('_source.')),
+                                .funs = function(x){ 
+                                    x %>% lapply(function(y){ 
+                                        stringr::str_split(y, "_source.")[[1]][2] 
+                                    })
+                                })
+                    }
                 } else {
-                    # if data.frame derivated, just load it as tibble
+                    # if data.frame derivative, just load it as tibble
                     message("from memory")
                     index_data <- index %>%
-                        dplyr::select( if(purrr::is_null(fields)) everything() else fields ) %>%
+                        dplyr::select( if(purrr::is_null(fields)) dplyr::everything() else fields ) %>%
                         (function(x){ if(!purrr::is_null(max_size)) head(x, max_size) else x }) %>%
-                        dplyr::as_tibble(validate = TRUE)
+                        dplyr::as_tibble(.name_repair = "unique")
                 }
+                # ret
                 index_data
             }
             # get left
             message("Getting left ", appendLF = FALSE)
-            left <- get_data(index = left_index, 
-                             fields = left_fields, 
-                             query = left_query, 
-                             bulk_size = left_bulk_size, 
-                             max_size = left_max_size)
+            left <- get_data(
+                    index = left_index, 
+                    fields = left_fields, 
+                    query = left_query, 
+                    bulk_size = left_bulk_size, 
+                    max_size = left_max_size
+                ) 
             # get right
             message("Getting right ", appendLF = FALSE)
-            right <- get_data(index = right_index, 
-                              fields = right_fields, 
-                              query = right_query, 
-                              bulk_size = right_bulk_size, 
-                              max_size = right_max_size)
-            # abstract call to dplyr joins
-            fname <- list(paste0(join_type, "_join"), "dplyr")
-            join_function <- do.call(what = "getFromNamespace", args = fname)
-            join_function(left, right, by = join_fields)
+            right <- get_data(
+                    index = right_index, 
+                    fields = right_fields, 
+                    query = right_query, 
+                    bulk_size = right_bulk_size, 
+                    max_size = right_max_size
+                )
+            # prepare args for join
+            fargs <- list(
+                left, 
+                right, 
+                by = by, 
+                suffix = c(".left", ".right")
+            )
+            # call to dplyr joins
+            join_type %>%
+                paste0("_join") %>%
+                list("dplyr") %>%
+                do.call(what = "getFromNamespace", args = .) %>%
+                do.call(args = fargs)
         },
 
 
@@ -2306,10 +2337,10 @@ Kibior <- R6Class(
         #'  c("name", "hair_color", "homeworld"))
         #'
         #' @param index_name the index name to use in Elasticsearch (default: NULL).
-        #' @param bulk_size the number of record to send to Elasticsearch in a row (default: 1000).
+        #' @param bulk_size the number of record to send to Elasticsearch in a row (default: 500).
         #' @param max_size the number of record Elasticsearch will send (default: NULL (all data)).
         #' @param scroll_timer the time the scroll API will let the request alive to scroll on the 
-        #'  result (default: "1m" (1 minute)).
+        #'  result (default: "3m" (3 minute)).
         #' @param keep_metadata does Elasticsearch needs to sent metadata? Data fields will be 
         #'  prefixed by "_source." (default: FALSE).
         #' @param fields a vector of fields to select (default: NULL (all fields)).
@@ -2325,7 +2356,7 @@ Kibior <- R6Class(
         #' @return a list of datasets corresponding to the pull request, else an error. Keys of the 
         #'  list are index names matching the request, value are the associated tibbles
         #'
-        pull = function(index_name = NULL, bulk_size = 1000, max_size = NULL, scroll_timer = "1m", keep_metadata = FALSE, fields = NULL, query = NULL) {
+        pull = function(index_name = NULL, bulk_size = 500, max_size = NULL, scroll_timer = "3m", keep_metadata = FALSE, fields = NULL, query = NULL) {
             args <- list(
                 index_name = index_name, 
                 keep_metadata = keep_metadata, 
@@ -2538,10 +2569,10 @@ Kibior <- R6Class(
         #'  c("name", "hair_color", "homeworld"))
         #'
         #' @param index_name the index name to use in Elasticsearch (default: NULL).
-        #' @param bulk_size the number of record to send to Elasticsearch in a row (default: 1000).
+        #' @param bulk_size the number of record to send to Elasticsearch in a row (default: 500).
         #' @param max_size the number of record Elasticsearch will send (default: NULL (all data)).
         #' @param scroll_timer the time the scroll API will let the request alive to scroll on the 
-        #'  result (default: "1m" (1 minute)).
+        #'  result (default: "3m" (3 minutes)).
         #' @param keep_metadata does Elasticsearch needs to sent metadata? Data fields will be 
         #'  prefixed by "_source." (default: FALSE).
         #' @param fields a vector of fields to select (default: NULL (all fields)).
@@ -2643,7 +2674,7 @@ Kibior <- R6Class(
                 # combine to raw_hits
                 workable_hits %>%
                     data.table::rbindlist(use.names = TRUE, fill = FALSE) %>%
-                    dplyr::as_tibble(validate = TRUE)
+                    dplyr::as_tibble(.name_repair = "unique")
             }
             # function: change column type
             change_column_type <- function(raw){
@@ -2862,8 +2893,8 @@ Kibior <- R6Class(
 
                             # get data from ES
                             res <- do.call(elastic::docs_mget, args) %>% 
-                                jsonlite::fromJSON(simplifyDataFrame = TRUE)
-                            
+                                jsonlite::fromJSON(simplifyDataFrame = TRUE) 
+
                             # if the result is not empty
                             nb_hits <- nrow(res$docs)
                             if(nb_hits > 0){
@@ -2951,7 +2982,7 @@ Kibior <- R6Class(
         #' @details
         #' Execute a inner join between two datasets using `dplyr` joins.
         #' The datasets can be in-memory (variable name) or the name of an currently stored 
-        #'  Elasticsearch index. Joins cannot be done on column of type "list" ("join_fields" 
+        #'  Elasticsearch index. Joins cannot be done on column of type "list" ("by" 
         #'  argument).
         #'
         #' @param ... see `join()` params.
@@ -2980,7 +3011,7 @@ Kibior <- R6Class(
         #' @details
         #' Execute a full join between two datasets using `dplyr` joins.
         #' The datasets can be in-memory (variable name) or the name of an currently stored 
-        #'  Elasticsearch index. Joins cannot be done on column of type "list" ("join_fields" 
+        #'  Elasticsearch index. Joins cannot be done on column of type "list" ("by" 
         #'  argument).
         #'
         #' @param ... see `join()` params.
@@ -3007,7 +3038,7 @@ Kibior <- R6Class(
         #' @details
         #' Execute a left join between two datasets using `dplyr` joins.
         #' The datasets can be in-memory (variable name) or the name of an currently stored 
-        #'  Elasticsearch index. Joins cannot be done on column of type "list" ("join_fields" 
+        #'  Elasticsearch index. Joins cannot be done on column of type "list" ("by" 
         #'  argument).
         #'
         #' @param ... see `join()` params.
@@ -3034,7 +3065,7 @@ Kibior <- R6Class(
         #' @details
         #' Execute a right join between two datasets using `dplyr` joins.
         #' The datasets can be in-memory (variable name) or the name of an currently stored 
-        #'  Elasticsearch index. Joins cannot be done on column of type "list" ("join_fields" 
+        #'  Elasticsearch index. Joins cannot be done on column of type "list" ("by" 
         #'  argument).
         #'
         #' @param ... see `join()` params.
@@ -3061,7 +3092,7 @@ Kibior <- R6Class(
         #' @details
         #' Execute a semi join between two datasets using `dplyr` joins.
         #' The datasets can be in-memory (variable name) or the name of an currently stored 
-        #'  Elasticsearch index. Joins cannot be done on column of type "list" ("join_fields" 
+        #'  Elasticsearch index. Joins cannot be done on column of type "list" ("by" 
         #'  argument).
         #'
         #' @param ... see `join()` params.
@@ -3088,7 +3119,7 @@ Kibior <- R6Class(
         #' @details
         #' Execute a anti join between two datasets using `dplyr` joins.
         #' The datasets can be in-memory (variable name) or the name of an currently stored 
-        #'  Elasticsearch index. Joins cannot be done on column of type "list" ("join_fields" 
+        #'  Elasticsearch index. Joins cannot be done on column of type "list" ("by" 
         #'  argument).
         #'
         #' @param ... see `join()` params.
