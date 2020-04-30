@@ -105,40 +105,45 @@ test_that("kibior::get_mappings, nominal case, multiple indices, no arg", {
 })
 
 test_that("kibior::get_mappings, nominal case, single index, index with data", {
-  rec <- c(names(starwars), "kid")
   remove_all_indices()
-  res <- kc$push(starwars, single_index_name)
+  expected_fields <- c(names(dplyr::starwars), "kid")
+  res <- kc$push(dplyr::starwars, single_index_name)
   expect_equal(res, single_index_name)
+  # test index name
   m <- kc$get_mappings()
   expect_equal(names(m), single_index_name)
-  pro <- names(m[[single_index_name]][[single_index_name]]$properties)
-  expect_setequal(rec, pro)
-  # get_mappings(name) == get_mappings()
   m2 <- kc$get_mappings(single_index_name)
-  expect_equal(names(m2), names(m))
-  pro2 <- names(m2[[single_index_name]][[single_index_name]]$properties)
-  expect_setequal(rec, pro2)
+  expect_equal(names(m2), single_index_name)
+  expect_length(names(m2), 1)
+  # test fields
+  fields <- m[[single_index_name]]$properties %>% names()
+  expect_setequal(fields, expected_fields)
+  fields <- m2[[single_index_name]]$properties %>% names()
+  expect_setequal(fields, expected_fields)
 })
 
 test_that("kibior::get_mappings, nominal case, multiple indices, indices with data", {
-  rec <- c(names(starwars), "kid")
-  remove_all_indices()
-  for(i in multiple_indice_names){
-    res <- kc$push(starwars, i)
-    expect_equal(res, i)
-  }
-  m <- kc$get_mappings()
-  expect_setequal(names(m), multiple_indice_names)
-  for(i in multiple_indice_names){
-    expect_equal(names(m[[i]]), i)
-    pro <- names(m[[i]][[i]]$properties)
-    expect_setequal(rec, pro)
-    # get_mappings(name) == get_mappings()
-    m2 <- kc$get_mappings(i)
-    expect_equal(names(m2), names(m[[i]]))
-    pro2 <- names(m2[[i]][[i]]$properties)
-    expect_setequal(rec, pro2)
-  }
+    remove_all_indices()
+    expected_fields <- c(names(dplyr::starwars), "kid")
+    for(i in multiple_indice_names){
+        res <- kc$push(dplyr::starwars, i)
+        expect_equal(res, i)
+    }
+    #
+    m <- kc$get_mappings()
+    expect_setequal(names(m), multiple_indice_names)
+    for(i in multiple_indice_names){
+        # test index name
+        expect_true(i %in% names(m))
+        m2 <- kc$get_mappings(i)
+        expect_equal(names(m2), i)
+        expect_length(names(m2), 1)
+        # test fields
+        fields <- m[[i]]$properties %>% names()
+        expect_setequal(fields, expected_fields)
+        fields <- m2[[i]]$properties %>% names()
+        expect_setequal(fields, expected_fields)
+    }
 })
 
 # end get_mappings
@@ -201,7 +206,7 @@ test_that("kibior::get_settings, nominal case, multiple indices, no arg", {
 
 test_that("kibior::get_settings, nominal case, single index, index with data", {
   remove_all_indices()
-  res <- kc$push(starwars, single_index_name)
+  res <- kc$push(dplyr::starwars, single_index_name)
   expect_equal(res, single_index_name)
   s <- kc$get_settings()
   expect_equal(names(s), single_index_name)
@@ -215,7 +220,7 @@ test_that("kibior::get_settings, nominal case, single index, index with data", {
 test_that("kibior::get_settings, nominal case, multiple indices, indices with data", {
   remove_all_indices()
   for(i in multiple_indice_names){
-    res <- kc$push(starwars, i)
+    res <- kc$push(dplyr::starwars, i)
     expect_equal(res, i)
   }
   s <- kc$get_settings()
@@ -240,6 +245,15 @@ test_that("kibior::get_settings, nominal case, multiple indices, indices with da
 
 # end get_aliases
 
+testthat::setup({
+    # remove indices if they exist
+    remove_all_indices()
+})
+
+testthat::teardown({
+    # remove indices if they exist
+    remove_all_indices()
+})
 
 
 # start count ----
@@ -256,7 +270,7 @@ test_that("kibior::count, wrong type", {
   expect_error(kc$count("nope", type = "nopeagain"))
   # with data
   remove_all_indices()
-  res <- kc$push(starwars, single_index_name)
+  res <- kc$push(dplyr::starwars, single_index_name)
   expect_equal(res, single_index_name)
   expect_error(kc$count(single_index_name, type = "allwrong"))
   expect_error(kc$count(single_index_name, type = NULL))
@@ -293,21 +307,21 @@ test_that("kibior::count, nominal case, multiple empty indices", {
 
 test_that("kibior::count, nominal case, single index", {
   remove_all_indices()
-  res <- kc$push(starwars, single_index_name)
+  res <- kc$push(dplyr::starwars, single_index_name)
   expect_equal(res, single_index_name)
-  expect_equal(nrow(starwars), kc$count(single_index_name, type = "observations")[[single_index_name]])
-  expect_equal(nrow(starwars), kc$count(single_index_name)[[single_index_name]]) # default type = "observations"
-  expect_equal(ncol(starwars) + 1, kc$count(single_index_name, type = "variables")[[single_index_name]])
+  expect_equal(nrow(dplyr::starwars), kc$count(single_index_name, type = "observations")[[single_index_name]])
+  expect_equal(nrow(dplyr::starwars), kc$count(single_index_name)[[single_index_name]]) # default type = "observations"
+  expect_equal(ncol(dplyr::starwars) + 1, kc$count(single_index_name, type = "variables")[[single_index_name]])
 })
 
 test_that("kibior::count, nominal case, multiple indices", {
   remove_all_indices()
   for(i in multiple_indice_names){
-    res <- kc$push(starwars, i)
+    res <- kc$push(dplyr::starwars, i)
     expect_equal(res, i)
-    expect_equal(nrow(starwars), kc$count(i, type = "observations")[[i]])
-    expect_equal(nrow(starwars), kc$count(i)[[i]]) # default type = "observations"
-    expect_equal(ncol(starwars) + 1, kc$count(i, type = "variables")[[i]])
+    expect_equal(nrow(dplyr::starwars), kc$count(i, type = "observations")[[i]])
+    expect_equal(nrow(dplyr::starwars), kc$count(i)[[i]]) # default type = "observations"
+    expect_equal(ncol(dplyr::starwars) + 1, kc$count(i, type = "variables")[[i]])
   }
 })
 
@@ -347,11 +361,11 @@ test_that("kibior::dim, nominal case, multiple empty indices", {
 
 test_that("kibior::dim, nominal case, single index", {
   remove_all_indices()
-  res <- kc$push(starwars, single_index_name)
+  res <- kc$push(dplyr::starwars, single_index_name)
   expect_equal(res, single_index_name)
   #
-  nr <- nrow(starwars)
-  nc <- ncol(starwars) + 1 # kid
+  nr <- nrow(dplyr::starwars)
+  nc <- ncol(dplyr::starwars) + 1 # kid
   r <- kc$dim(res)[[res]]
   expect_setequal(c(nr, nc), r) 
   # test type
@@ -361,12 +375,12 @@ test_that("kibior::dim, nominal case, single index", {
 test_that("kibior::dim, nominal case, multiple indices", {
   remove_all_indices()
   for (i in multiple_indice_names){
-    res <- kc$push(starwars, i)
+    res <- kc$push(dplyr::starwars, i)
     expect_equal(res, i)
   }
   #
-  nr <- nrow(starwars)
-  nc <- ncol(starwars) + 1 # kid
+  nr <- nrow(dplyr::starwars)
+  nc <- ncol(dplyr::starwars) + 1 # kid
   # one by one
   for(i in multiple_indice_names){
     r <- kc$dim(i)[[i]]

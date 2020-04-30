@@ -2,6 +2,15 @@
 
 context("Cluster wealth")
 
+testthat::setup({
+    # remove indices if they exist
+    remove_all_indices()
+})
+
+testthat::teardown({
+    # remove indices if they exist
+    remove_all_indices()
+})
 
 
 # start stats ----

@@ -3,7 +3,15 @@
 context("Move data")
 
 
+testthat::setup({
+    # remove indices if they exist
+    remove_all_indices()
+})
 
+testthat::teardown({
+    # remove indices if they exist
+    remove_all_indices()
+})
 
 
 # start export ----
@@ -31,7 +39,7 @@ test_that("kibior::export, wrong elastic index name", {
 })
 
 test_that("kibior::export, file already exists", {
-  remove_temp_files()
+  unlink(temp_filepath)
   res <- kc$export(starwars, temp_filepath)
   expect_equal(res, temp_filepath)
   expect_true(file.exists(temp_filepath))
@@ -40,7 +48,7 @@ test_that("kibior::export, file already exists", {
 })
 
 test_that("kibior::export, nominal case, export from memory", {
-  remove_temp_files()
+  unlink(temp_filepath)
   res <- kc$export(starwars, temp_filepath)
   expect_equal(res, temp_filepath)
   expect_true(file.exists(temp_filepath))
@@ -49,7 +57,7 @@ test_that("kibior::export, nominal case, export from memory", {
 })
 
 test_that("kibior::export, nominal case, export from elasticsearch", {
-  remove_temp_files()
+  unlink(temp_filepath)
   remove_all_indices()
   iname <- "sw"
   res <- kc$push(starwars, iname)
@@ -90,7 +98,7 @@ test_that("kibior::import, wrong args", {
 
 test_that("kibior::import, nominal case", {
   remove_all_indices()
-  remove_temp_files()
+  unlink(temp_filepath)
   kc$export(starwars, temp_filepath)
   # no push
   res <- kc$import(filepath = temp_filepath)

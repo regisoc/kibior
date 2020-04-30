@@ -1,28 +1,70 @@
 
 context("Initialize")
 
+testthat::setup({
+    # remove indices if they exist
+    remove_all_indices()
+    kc_new <- NULL
+    # assign var to global env
+    assign("kc_new", kc_new, envir = .GlobalEnv)
+})
+
+testthat::teardown({
+    # remove indices if they exist
+    remove_all_indices()
+    # remove var from global env 
+    rm(kc_new, envir = .GlobalEnv)
+})
+
+
 # start initialize namespace ----
 
 test_that("kibior::initialize, nominal case", {
-  kc <- Kibior$new(host = "elasticsearch")
-  expect_equal(kc$host, "elasticsearch")
-  expect_equal(kc$port, 9200)
-  expect_equal(kc$user, NULL)
-  expect_equal(kc$pwd, NULL)
-  expect_equal(kc$verbose, FALSE)
+  kc_new <- Kibior$new(es_endpoint, es_port, es_username, es_password)
   # 
-  expect_equal(kc$head_search_size, 5)
-  expect_equal(kc$valid_joins, c("inner", "full", "left", "right", "semi", "anti"))
-  expect_equal(kc$cluster_name, "docker-cluster")
-  expect_true(kc$cluster_status %in% c("green", "yellow"))
+  expect_equal(kc_new$host, es_endpoint)
+  expect_equal(kc_new$port, es_port)
+  expect_equal(kc_new$user, es_username)
+  expect_equal(kc_new$pwd, es_password)
+  expect_equal(kc_new$verbose, FALSE)
+  expect_equal(kc_new$quiet_progress, FALSE)
+  expect_equal(kc_new$quiet_results, FALSE)
+  # 
+  expect_true(kc_new$cluster_status %in% c("green", "yellow"))
 })
 
-test_that("kibior::initialize, host param, no credentials", {
-  expect_error(Kibior$new(host = "elasticsearch", port = 9203, verbose = TRUE))
+test_that("kibior::initialize, no host", {
+  expect_error(Kibior$new())
+  expect_error(Kibior$new(""))
+})
+
+test_that("kibior::initialize, wrong host", {
+  expect_error(Kibior$new("nope"))
+})
+
+test_that("kibior::initialize, host param, w/wo credentials", {
+    # only works when username is not null
+    if(!purrr::is_null(es_username)){
+        expect_error(Kibior$new(host = es_endpoint, port = es_port, verbose = TRUE))
+    } else {
+        # no user/pwd given, cannot assert ES is secure or not.
+        # if not secure, see previous tests
+        # if it is, this test + the next one are taken into account
+        expect_true(TRUE)
+    }
 })
 
 test_that("kibior::initialize, host param and credentials", {
-  expect_error(Kibior$new(host = "elasticsearch", port = 9203, user = "nope", pwd = "qwerty", verbose = TRUE))
+    # only works when username is not null
+    if(!purrr::is_null(es_username)){
+        # try wrong user/pwd couple
+        expect_error(Kibior$new(host = es_endpoint, port = es_port, user = "nope", pwd = "nope"))
+    } else {
+        # no user/pwd given, cannot assert ES is secure or not.
+        # if not secure, see previous tests
+        # if it is, this test + the last one are taken into account
+        expect_true(TRUE)
+    }
 })
 
 test_that("kibior::initialize, wrong host message error", {
@@ -57,21 +99,30 @@ test_that("kibior::initialize, wrong verbose arg type", {
 # start print namespace ----
 
 test_that("kibior::print, nominal case", {
-  kc <- Kibior$new("elasticsearch")
-  expect_output(print(kc), "KibioR client: 
+  kc_new <- Kibior$new(es_endpoint)
+  expect_output(print(kc_new), "KibioR client: 
   - host: elasticsearch 
   - port: 9200 
-  - verbose: FALSE ")
+  - verbose: no 
+  - print result: yes 
+  - print progressbar: yes ")
 })
 
 test_that("kibior::print, nominal case, args change", {
-  kc <- Kibior$new(host = "elasticsearch", user = "elastic", pwd = "changeme", verbose = TRUE)
-  expect_output(print(kc), "KibioR client: 
-  - host: elasticsearch 
-  - port: 9200 
-  - username: elastic 
-  - password: changeme 
-  - verbose: TRUE ")
+  kc_new <- Kibior$new(host = es_endpoint, user = es_username, pwd = es_password, verbose = TRUE)
+  msg <- paste0("KibioR client: 
+  - host: ", es_endpoint, " 
+  - port: ", es_port, " ")
+  if(!purrr::is_null(es_username)){
+    msg <- paste0(msg, "
+  - username: ", es_username, " 
+  - password: ", es_password, " ")
+  }
+  msg <- paste0(msg, "
+  - verbose: yes 
+  - print result: yes 
+  - print progressbar: yes ")
+  expect_output(print(kc_new), msg)
 })
 
 # end print namespace 

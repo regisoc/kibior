@@ -2,6 +2,22 @@
 
 context("CRUD index")
 
+
+
+testthat::setup({
+    # remove indices if they exist
+    remove_all_indices()
+    
+})
+
+testthat::teardown({
+    # remove indices if they exist
+    remove_all_indices()
+})
+
+
+
+
 # start create ----
 
 test_that("kibior::create, nominal case single creation", {
