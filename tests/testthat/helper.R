@@ -15,81 +15,90 @@
 library(magrittr)
 library(dplyr)
 
+
+get_elastic_var_from_env <- function(){
+    # env vars
+    env_es_endpoint <- "KIBIOR_BUILD_ES_ENDPOINT"
+    env_es_port     <- "KIBIOR_BUILD_ES_PORT"
+    env_es_username <- "KIBIOR_BUILD_ES_USERNAME"
+    env_es_password <- "KIBIOR_BUILD_ES_PASSWORD"
+    # extract from env var
+    eget <- function(x){
+        x %>% 
+            Sys.getenv() %>% 
+            trimws() %>% 
+            (function(y){ 
+                if(y == "") NULL else y 
+            })
+    }
+    # endpoint
+    es_endpoint <- eget(env_es_endpoint)
+    if(purrr::is_null(es_endpoint)){
+        msg <- "Try loading Kibior tests but lacks Elasticsearch endpoint.\n"
+        msg <- paste0(msg, "Tests and vignettes building require some environment variable to be set.\n")
+        msg <- paste0(msg, " - ", env_es_endpoint, ", default: NULL, REQUIRED\n")
+        msg <- paste0(msg, " - ", env_es_port, ", default: 9200\n")
+        msg <- paste0(msg, " - ", env_es_username, ", default: NULL\n")
+        msg <- paste0(msg, " - ", env_es_password, ", default: NULL\n")
+        msg <- paste0(msg, "It should be local and empty. See documentation for more information.")
+        stop(msg)
+    }
+    message("Elastic endpoint: ", es_endpoint)
+    # port
+    es_port <- tryCatch(
+        {
+            env_es_port %>%
+                eget() %>% 
+                (function(x){ if(purrr::is_null(x)) 9200L else as.integer(x) })
+        },
+        warning = function(w){
+            # coercion of str to int -> NA + warning
+            stop(env_es_port, " must be a number.")
+        }
+    )
+    message("Elastic port: ", es_port)
+    # args
+    args <- list(
+        host = es_endpoint, 
+        port = es_port,  
+        verbose = FALSE
+    )
+    # if auth, add username and pwd in args
+    es_username <- eget(env_es_username)
+    es_password <- eget(env_es_password)
+    if(!purrr::is_null(es_username)){
+        args <- c(
+            args, 
+            list(
+                user = es_username, 
+                pwd = es_password
+            )
+        )
+        message("Elastic username: ", es_username)
+        message("Elastic password: ", es_password)
+    }
+    # return
+    args
+}
+
 message()
 message("----------------------------------")
 message("-- GLOBAL DEFINITION")
 message()
 
-message("Getting build variables...")
-# env var names
-env_es_endpoint <- "KIBIOR_BUILD_ES_ENDPOINT"
-env_es_port <- "KIBIOR_BUILD_ES_PORT"
-env_es_username <- "KIBIOR_BUILD_ES_USERNAME"
-env_es_password <- "KIBIOR_BUILD_ES_PASSWORD"
+message("Getting build variables from env...")
+# as list
+args <- get_elastic_var_from_env()
 
-eget <- function(x){
-    x %>% 
-        Sys.getenv() %>% 
-        trimws() %>% 
-        (function(y){ 
-            if(y == "") NULL else y 
-        })
-}
-# endpoint
-es_endpoint <- eget(env_es_endpoint)
-if(purrr::is_null(es_endpoint)){
-    msg <- "Try loading Kibior tests but lacks Elasticsearch endpoint.\n"
-    msg <- paste0(msg, "Tests and vignettes building require some environment variable to be set.\n")
-    msg <- paste0(msg, " - ", env_es_endpoint, ", default: NULL, REQUIRED\n")
-    msg <- paste0(msg, " - ", env_es_port, ", default: 9200\n")
-    msg <- paste0(msg, " - ", env_es_username, ", default: NULL\n")
-    msg <- paste0(msg, " - ", env_es_password, ", default: NULL\n")
-    msg <- paste0(msg, "It should be local and empty. See documentation for more information.")
-    stop(msg)
-}
-message("Variable added: es_endpoint")
-# port
-es_port <- tryCatch(
-    {
-        env_es_port %>%
-            eget() %>% 
-            (function(x){ if(purrr::is_null(x)) 9200L else as.integer(x) })
-    },
-    warning = function(w){
-        # coercion of str to int -> NA + warning
-        stop(env_es_port, " must be a number.")
-    }
-)
-message("Variable added: es_port")
-# args
-args <- list(
-    host = es_endpoint, 
-    port = es_port,  
-    verbose = FALSE
-)
-# if auth, add username and pwd in args
-es_username <- eget(env_es_username)
-es_password <- eget(env_es_password)
-if(!purrr::is_null(es_username)){
-    args <- c(
-        args, 
-        list(
-            user = es_username, 
-            pwd = es_password
-        )
-    )
-}
-message("Variable added: es_username")
-message("Variable added: es_password")
 #
 kc <- do.call(Kibior$new, args)
 kc$quiet_progress <- TRUE
-# # test if targeted ES is empty before building project
-# if(!purrr::is_null(kc$list())){
-#     msg <- paste0("Target Elasticsearch '", kc$endpoint, "' is not empty. ")
-#     msg <- paste0(msg, "Please, use an empty Elasticsearch instance to build project.")
-#     stop(msg)
-# }
+# test if targeted ES is empty before building project
+if(!purrr::is_null(kc$list())){
+    msg <- paste0("Target Elasticsearch '", kc$endpoint, "' is not empty. ")
+    msg <- paste0(msg, "Please, use an empty Elasticsearch instance to build project.")
+    stop(msg)
+}
 message("Kibior build instance: kc")
 
 
