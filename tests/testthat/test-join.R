@@ -7,8 +7,10 @@ testthat::setup({
     # remove indices if they exist
     remove_all_indices()
     #
-    employee %>% kc$push("employee", id_col = "emp_id")
-    dept %>% kc$push("dept", id_col = "dept_id")
+    employee %>% 
+        kc$push("employee", id_col = "emp_id")
+    dept %>% 
+        kc$push("dept", id_col = "dept_id")
     # to test 
     dplyr::starwars %>% 
         change_names() %>% 
@@ -1046,11 +1048,493 @@ test_that("kibior::joins, simple join with by, remote vs. remote, anti join, kee
 
 
 
+## No Query
+
+
+## local vs. local
+# query for local is thrown to dplyr::filter
+
+test_that("kibior::joins, simple join without query, local vs. local, inner join", {
+    r <- kc$inner_join(employee, dept, by = join_fields)
+    dr <- dplyr::inner_join(employee, dept, by = join_fields)
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join without query, local vs. local, full join", {
+    r <- kc$full_join(employee, dept, by = join_fields)
+    dr <- dplyr::full_join(employee, dept, by = join_fields)
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join without query, local vs. local, left join", {
+    r <- kc$left_join(employee, dept, by = join_fields)
+    dr <- dplyr::left_join(employee, dept, by = join_fields)
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join without query, local vs. local, right join", {
+    r <- kc$right_join(employee, dept, by = join_fields)
+    dr <- dplyr::right_join(employee, dept, by = join_fields)
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join without query, local vs. local, semi join", {
+    r <- kc$semi_join(employee, dept, by = join_fields)
+    dr <- dplyr::semi_join(employee, dept, by = join_fields)
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join without query, local vs. local, anti join", {
+    r <- kc$anti_join(employee, dept, by = join_fields)
+    dr <- dplyr::anti_join(employee, dept, by = join_fields)
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+
+
+## local vs. remote
+
+test_that("kibior::joins, simple join without query, local vs. remote, inner join", {
+    r <- kc$inner_join(employee, "dept", by = join_fields)
+    dr <- dplyr::inner_join(employee, dept, by = join_fields)
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join without query, local vs. remote, full join", {
+    r <- kc$full_join(employee, "dept", by = join_fields)
+    dr <- dplyr::full_join(employee, dept, by = join_fields)
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join without query, local vs. remote, left join", {
+    r <- kc$left_join(employee, "dept", by = join_fields)
+    dr <- dplyr::left_join(employee, dept, by = join_fields)
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join without query, local vs. remote, right join", {
+    r <- kc$right_join(employee, "dept", by = join_fields)
+    dr <- dplyr::right_join(employee, dept, by = join_fields)
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join without query, local vs. remote, semi join", {
+    r <- kc$semi_join(employee, "dept", by = join_fields)
+    dr <- dplyr::semi_join(employee, dept, by = join_fields)
+    expect_equal(length(names(r)), length(names(dr)) ) # same length
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join without query, local vs. remote, anti join", {
+    r <- kc$anti_join(employee, "dept", by = join_fields)
+    dr <- dplyr::anti_join(employee, dept, by = join_fields)
+    expect_equal(length(names(r)), length(names(dr)) ) # same length
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+
+
+## remote vs. local
+
+test_that("kibior::joins, simple join without query, remote vs. local, inner join", {
+    r <- kc$inner_join("employee", dept, by = join_fields)
+    dr <- dplyr::inner_join(employee, dept, by = join_fields)
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join without query, remote vs. local, full join", {
+    r <- kc$full_join("employee", dept, by = join_fields)
+    dr <- dplyr::full_join(employee, dept, by = join_fields)
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join without query, remote vs. local, left join", {
+    r <- kc$left_join("employee", dept, by = join_fields)
+    dr <- dplyr::left_join(employee, dept, by = join_fields)
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join without query, remote vs. local, right join", {
+    r <- kc$right_join("employee", dept, by = join_fields)
+    dr <- dplyr::right_join(employee, dept, by = join_fields)
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join without query, remote vs. local, semi join", {
+    r <- kc$semi_join("employee", dept, by = join_fields)
+    dr <- dplyr::semi_join(employee, dept, by = join_fields)
+    expect_equal(length(names(r)), length(names(dr)) ) # same length
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join without query, remote vs. local, anti join", {
+    r <- kc$anti_join("employee", dept, by = join_fields)
+    dr <- dplyr::anti_join(employee, dept, by = join_fields)
+    expect_equal(length(names(r)), length(names(dr)) ) # same length
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+
+
+## remote vs. remote
+
+test_that("kibior::joins, simple join without query, remote vs. remote, inner join", {
+    r <- kc$inner_join("employee", "dept", by = join_fields)
+    dr <- dplyr::inner_join(employee, dept, by = join_fields)
+    expect_false("kid.left" %in% names(r))
+    expect_false("kid.right" %in% names(r))
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join without query, remote vs. remote, full join", {
+    r <- kc$full_join("employee", "dept", by = join_fields)
+    dr <- dplyr::full_join(employee, dept, by = join_fields)
+    expect_false("kid.left" %in% names(r))
+    expect_false("kid.right" %in% names(r))
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join without query, remote vs. remote, left join", {
+    r <- kc$left_join("employee", "dept", by = join_fields)
+    dr <- dplyr::left_join(employee, dept, by = join_fields)
+    expect_false("kid.left" %in% names(r))
+    expect_false("kid.right" %in% names(r))
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join without query, remote vs. remote, right join", {
+    r <- kc$right_join("employee", "dept", by = join_fields)
+    dr <- dplyr::right_join(employee, dept, by = join_fields)
+    expect_false("kid.left" %in% names(r))
+    expect_false("kid.right" %in% names(r))
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join without query, remote vs. remote, semi join", {
+    r <- kc$semi_join("employee", "dept", by = join_fields)
+    dr <- dplyr::semi_join(employee, dept, by = join_fields)
+    expect_false("kid.left" %in% names(r))
+    expect_false("kid.right" %in% names(r))
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join without query, remote vs. remote, anti join", {
+    r <- kc$anti_join("employee", "dept", by = join_fields)
+    dr <- dplyr::anti_join(employee, dept, by = join_fields)
+    expect_false("kid.left" %in% names(r))
+    expect_false("kid.right" %in% names(r))
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+
+
+
+
+
+
+
+
+
+
+## Query
+
+
+## local vs. local
+
+test_that("kibior::joins, simple join with query, local vs. local, inner join", {
+    ee <- employee %>% dplyr::filter(!!query_local)
+    r <- kc$inner_join(ee, dept, by = join_fields)
+    dr <- dplyr::inner_join(ee, dept, by = join_fields)
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join with query, local vs. local, full join", {
+    ee <- employee %>% dplyr::filter(!!query_local)
+    r <- kc$full_join(ee, dept, by = join_fields)
+    dr <- dplyr::full_join(ee, dept, by = join_fields)
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join with query, local vs. local, left join", {
+    ee <- employee %>% dplyr::filter(!!query_local)
+    r <- kc$left_join(ee, dept, by = join_fields)
+    dr <- dplyr::left_join(ee, dept, by = join_fields)
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join with query, local vs. local, right join", {
+    ee <- employee %>% dplyr::filter(!!query_local)
+    r <- kc$right_join(ee, dept, by = join_fields)
+    dr <- dplyr::right_join(ee, dept, by = join_fields)
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join with query, local vs. local, semi join", {
+    ee <- employee %>% dplyr::filter(!!query_local)
+    r <- kc$semi_join(ee, dept, by = join_fields)
+    dr <- dplyr::semi_join(ee, dept, by = join_fields)
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join with query, local vs. local, anti join", {
+    ee <- employee %>% dplyr::filter(!!query_local)
+    r <- kc$anti_join(ee, dept, by = join_fields)
+    dr <- dplyr::anti_join(ee, dept, by = join_fields)
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+
+
+## local vs. remote
+
+test_that("kibior::joins, simple join with query, local vs. remote, inner join", {
+    ee <- employee %>% dplyr::filter(!!query_local)
+    r <- kc$inner_join(ee, "dept", by = join_fields)
+    dr <- dplyr::inner_join(ee, dept, by = join_fields)
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join with query, local vs. remote, full join", {
+    ee <- employee %>% dplyr::filter(!!query_local)
+    r <- kc$full_join(ee, "dept", by = join_fields)
+    dr <- dplyr::full_join(ee, dept, by = join_fields)
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join with query, local vs. remote, left join", {
+    ee <- employee %>% dplyr::filter(!!query_local)
+    r <- kc$left_join(ee, "dept", by = join_fields)
+    dr <- dplyr::left_join(ee, dept, by = join_fields)
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join with query, local vs. remote, right join", {
+    ee <- employee %>% dplyr::filter(!!query_local)
+    r <- kc$right_join(ee, "dept", by = join_fields)
+    dr <- dplyr::right_join(ee, dept, by = join_fields)
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join with query, local vs. remote, semi join", {
+    ee <- employee %>% dplyr::filter(!!query_local)
+    r <- kc$semi_join(ee, "dept", by = join_fields)
+    dr <- dplyr::semi_join(ee, dept, by = join_fields)
+    expect_equal(length(names(r)), length(names(dr)) ) # same length
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join with query, local vs. remote, anti join", {
+    ee <- employee %>% dplyr::filter(!!query_local)
+    r <- kc$anti_join(ee, "dept", by = join_fields)
+    dr <- dplyr::anti_join(ee, dept, by = join_fields)
+    expect_equal(length(names(r)), length(names(dr)) ) # same length
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+
+
+## remote vs. local
+
+test_that("kibior::joins, simple join with query, remote vs. local, inner join", {
+    ee <- employee %>% dplyr::filter(!!query_local)
+    r <- kc$inner_join("employee", dept, by = join_fields, left_query = query_remote)
+    dr <- dplyr::inner_join(ee, dept, by = join_fields)
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join with query, remote vs. local, full join", {
+    ee <- employee %>% dplyr::filter(!!query_local)
+    r <- kc$full_join("employee", dept, by = join_fields, left_query = query_remote)
+    dr <- dplyr::full_join(ee, dept, by = join_fields)
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join with query, remote vs. local, left join", {
+    ee <- employee %>% dplyr::filter(!!query_local)
+    r <- kc$left_join("employee", dept, by = join_fields, left_query = query_remote)
+    dr <- dplyr::left_join(ee, dept, by = join_fields)
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join with query, remote vs. local, right join", {
+    ee <- employee %>% dplyr::filter(!!query_local)
+    r <- kc$right_join("employee", dept, by = join_fields, left_query = query_remote)
+    dr <- dplyr::right_join(ee, dept, by = join_fields)
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join with query, remote vs. local, semi join", {
+    ee <- employee %>% dplyr::filter(!!query_local)
+    r <- kc$semi_join("employee", dept, by = join_fields, left_query = query_remote)
+    dr <- dplyr::semi_join(ee, dept, by = join_fields)
+    expect_equal(length(names(r)), length(names(dr)) ) # same length
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join with query, remote vs. local, anti join", {
+    ee <- employee %>% dplyr::filter(!!query_local)
+    r <- kc$anti_join("employee", dept, by = join_fields, left_query = query_remote)
+    dr <- dplyr::anti_join(ee, dept, by = join_fields)
+    expect_equal(length(names(r)), length(names(dr)) ) # same length
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+
+
+## remote vs. remote
+
+test_that("kibior::joins, simple join with query, remote vs. remote, inner join", {
+    ee <- employee %>% dplyr::filter(!!query_local)
+    r <- kc$inner_join("employee", "dept", by = join_fields, left_query = query_remote)
+    dr <- dplyr::inner_join(ee, dept, by = join_fields)
+    expect_false("kid.left" %in% names(r))
+    expect_false("kid.right" %in% names(r))
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join with query, remote vs. remote, full join", {
+    ee <- employee %>% dplyr::filter(!!query_local)
+    r <- kc$full_join("employee", "dept", by = join_fields, left_query = query_remote)
+    dr <- dplyr::full_join(ee, dept, by = join_fields)
+    expect_false("kid.left" %in% names(r))
+    expect_false("kid.right" %in% names(r))
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join with query, remote vs. remote, left join", {
+    ee <- employee %>% dplyr::filter(!!query_local)
+    r <- kc$left_join("employee", "dept", by = join_fields, left_query = query_remote)
+    dr <- dplyr::left_join(ee, dept, by = join_fields)
+    expect_false("kid.left" %in% names(r))
+    expect_false("kid.right" %in% names(r))
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join with query, remote vs. remote, right join", {
+    ee <- employee %>% dplyr::filter(!!query_local)
+    r <- kc$right_join("employee", "dept", by = join_fields, left_query = query_remote)
+    dr <- dplyr::right_join(ee, dept, by = join_fields)
+    expect_false("kid.left" %in% names(r))
+    expect_false("kid.right" %in% names(r))
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join with query, remote vs. remote, semi join", {
+    ee <- employee %>% dplyr::filter(!!query_local)
+    r <- kc$semi_join("employee", "dept", by = join_fields, left_query = query_remote)
+    dr <- dplyr::semi_join(ee, dept, by = join_fields)
+    expect_false("kid.left" %in% names(r))
+    expect_false("kid.right" %in% names(r))
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+test_that("kibior::joins, simple join with query, remote vs. remote, anti join", {
+    ee <- employee %>% dplyr::filter(!!query_local)
+    r <- kc$anti_join("employee", "dept", by = join_fields, left_query = query_remote)
+    dr <- dplyr::anti_join(ee, dept, by = join_fields)
+    expect_false("kid.left" %in% names(r))
+    expect_false("kid.right" %in% names(r))
+    expect_setequal(names(r), names(dr))
+    expect_equal(nrow(r), nrow(dr))
+    expect_setequal(r$emp_id, dr$emp_id)
+})
+
+
+
+
+
+
+
 
 ## SUPPLEMENT 
 
 
-# query 
 # fields
 # bulk_size
 # max_size
