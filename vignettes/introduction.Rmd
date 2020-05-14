@@ -225,8 +225,8 @@ If you already have configured Elasticsearch instances, change the next `$new()`
 #> 
 #>  KIBIOR_BUILD_ES_ENDPOINT="elasticsearch"
 #>  KIBIOR_BUILD_ES_PORT=9200 
-#>  KIBIOR_BUILD_ES_USERNAME=
-#>  KIBIOR_BUILD_ES_PASSWORD=
+#>  # KIBIOR_BUILD_ES_USERNAME=
+#>  # KIBIOR_BUILD_ES_PASSWORD=
 #>
 #> and will match the following initialization values:
 #>
@@ -239,86 +239,19 @@ If you already have configured Elasticsearch instances, change the next `$new()`
 #> which will bind "kc" to the instance named "docker-cluster"
 #>
 
-message("Getting vignette variables...")
-
-# env var names
-env_es_endpoint <- "KIBIOR_BUILD_ES_ENDPOINT"
-env_es_port     <- "KIBIOR_BUILD_ES_PORT"
-env_es_username <- "KIBIOR_BUILD_ES_USERNAME"
-env_es_password <- "KIBIOR_BUILD_ES_PASSWORD"
-
-eget <- function(x){
-    x %>% 
-        Sys.getenv() %>% 
-        trimws() %>% 
-        (function(y){ 
-            if(y == "") NULL else y 
-        })
-}
-# endpoint
-es_endpoint <- eget(env_es_endpoint)
-if(purrr::is_null(es_endpoint)){
-    msg <- "Try loading Kibior tests but lacks Elasticsearch endpoint.\n"
-    msg <- paste0(msg, "Tests and vignettes building require some environment variable to be set.\n")
-    msg <- paste0(msg, " - ", env_es_endpoint, ", default: NULL, REQUIRED\n")
-    msg <- paste0(msg, " - ", env_es_port, ", default: 9200\n")
-    msg <- paste0(msg, " - ", env_es_username, ", default: NULL\n")
-    msg <- paste0(msg, " - ", env_es_password, ", default: NULL\n")
-    msg <- paste0(msg, "It should be local and empty. See documentation for more information.")
-    stop(msg)
-}
-message("Variable added: es_endpoint=", es_endpoint)
-# port
-es_port <- tryCatch(
-    {
-        env_es_port %>%
-            eget() %>% 
-            (function(x){ if(purrr::is_null(x)) 9200L else as.integer(x) })
-    },
-    warning = function(w){
-        # coercion of str to int -> NA + warning
-        stop(env_es_port, " must be a number.")
-    }
-)
-message("Variable added: es_port=", es_port)
-# args
-args <- list(
-    host = es_endpoint, 
-    port = es_port,  
-    verbose = FALSE
-)
-# if auth, add username and pwd in args
-es_username <- eget(env_es_username)
-es_password <- eget(env_es_password)
-if(!purrr::is_null(es_username)){
-    args <- c(
-        args, 
-        list(
-            user = es_username, 
-            pwd = es_password
-        )
-    )
-}
-message("Variable added: es_username=", es_username)
-message("Variable added: es_password=", es_password)
-#
-kc <- do.call(Kibior$new, args)
-
-# test if targeted ES is empty before building project
-#if(!purrr::is_null(kc$list())){
-#    msg <- paste0("Target Elasticsearch '", kc$endpoint, "' is not empty. ")
-#    msg <- paste0(msg, "Please, use an empty Elasticsearch instance to build project.")
-#    stop(msg)
-#}
-
-#> quiet progress bar
-kc$verbose <- FALSE
-kc$quiet_progress <- TRUE
+# get kibior var from ".Renviron" file
+dd <- system.file("doc_env", "kibior_build.R", package = "kibior")
+source(dd, local = TRUE)
+kc <- .kibior_get_instance_from_env()
 ```
+
 
 ```{r kibior-vignette-instance}
 #> Kibior vignette instance: kc
 kc
+#> quiet progress bar and verbose mode
+kc$verbose <- FALSE
+kc$quiet_progress <- TRUE
 ```
 
 > The default `login/password` for Elasticsearch is `elastic/changeme`
@@ -630,7 +563,6 @@ data_from_file
 
 Note: `Kibior` is using `rio` package [@ref_rio] that can export much more formats. 
 See [rio documentation](https://github.com/leeper/rio#supported-file-formats) and `rio::install_formats()` function.
-
 
 The `$import()` method can natively manage alignement and feature formats (e.g. fasta, bam, gtf, gff, bed, etc.) since it also wraps Bioconductor library methods such as [`rtracklayer::import()`](https://doi.org/doi:10.18129/B9.bioc.rtracklayer) [@ref_rtracklayer], [`Biostrings::read*StringSet()`](https://doi.org/doi:10.18129/B9.bioc.Biostrings) [@ref_biostrings] and [`Rsamtools::scanBam()`](https://doi.org/doi:10.18129/B9.bioc.Rsamtools) [@ref_rsamtools] as optional import packages.
 
