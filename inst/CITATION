@@ -1,0 +1,16 @@
+citHeader("To cite kibior in publications use:")
+
+citEntry(
+    entry       = "unpublished",
+    title       = "{kibior}: R client easing data sharing and analysis with Elasticsearch.",
+    author      = personList(as.person("Régis Ongaro-Carcy")),
+    year        = "2020",
+    url         = "https://github.com/regisoc/kibior",
+
+    textVersion =
+    paste(
+        "Régis Ongaro-Carcy (2020).",
+        "kibior: R client easing data sharing and analysis with Elasticsearch.",
+        "URL https://github.com/regisoc/kibior."
+    )
+)
