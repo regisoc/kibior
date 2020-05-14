@@ -43,6 +43,9 @@ before_install:
 r_github_packages:
   - r-lib/covr
 
+r_packages:
+  - rmarkdown
+
 # install call
 
 before_script:
