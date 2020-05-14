@@ -4,33 +4,20 @@ context("Initialize")
 testthat::setup({
     # remove indices if they exist
     remove_all_indices()
-    kc_new <- NULL
-    # assign var to global env
-    assign("kc_new", kc_new, envir = .GlobalEnv)
 })
 
 testthat::teardown({
     # remove indices if they exist
     remove_all_indices()
-    # remove var from global env 
-    rm(kc_new, envir = .GlobalEnv)
 })
 
 
 # start initialize namespace ----
 
 test_that("kibior::initialize, nominal case", {
-  kc_new <- Kibior$new(es_endpoint, es_port, es_username, es_password)
   # 
-  expect_equal(kc_new$host, es_endpoint)
-  expect_equal(kc_new$port, es_port)
-  expect_equal(kc_new$user, es_username)
-  expect_equal(kc_new$pwd, es_password)
-  expect_equal(kc_new$verbose, FALSE)
-  expect_equal(kc_new$quiet_progress, FALSE)
-  expect_equal(kc_new$quiet_results, FALSE)
-  # 
-  expect_true(kc_new$cluster_status %in% c("green", "yellow"))
+  expect_equal(kc$host, trimws(Sys.getenv("KIBIOR_BUILD_ES_ENDPOINT")))
+  expect_true(kc$cluster_status %in% c("green", "yellow"))
 })
 
 test_that("kibior::initialize, no host", {
@@ -44,8 +31,8 @@ test_that("kibior::initialize, wrong host", {
 
 test_that("kibior::initialize, host param, w/wo credentials", {
     # only works when username is not null
-    if(!purrr::is_null(es_username)){
-        expect_error(Kibior$new(host = es_endpoint, port = es_port, verbose = TRUE))
+    if(!purrr::is_null(kc$user)){
+        expect_error(Kibior$new(host = kc$user, port = kc$port, verbose = TRUE))
     } else {
         # no user/pwd given, cannot assert ES is secure or not.
         # if not secure, see previous tests
@@ -56,9 +43,9 @@ test_that("kibior::initialize, host param, w/wo credentials", {
 
 test_that("kibior::initialize, host param and credentials", {
     # only works when username is not null
-    if(!purrr::is_null(es_username)){
+    if(!purrr::is_null(kc$user)){
         # try wrong user/pwd couple
-        expect_error(Kibior$new(host = es_endpoint, port = es_port, user = "nope", pwd = "nope"))
+        expect_error(Kibior$new(host = kc$host, port = kc$port, user = "nope", pwd = "nope"))
     } else {
         # no user/pwd given, cannot assert ES is secure or not.
         # if not secure, see previous tests
@@ -99,24 +86,24 @@ test_that("kibior::initialize, wrong verbose arg type", {
 # start print namespace ----
 
 test_that("kibior::print, nominal case", {
-  kc_new <- Kibior$new(es_endpoint)
-  expect_output(print(kc_new), "KibioR client: 
-  - host: elasticsearch 
-  - port: 9200 
+    expected_output <- paste0("KibioR client: 
+  - host: ", kc$host, " 
+  - port: ", kc$port, " 
   - verbose: no 
   - print result: yes 
-  - print progressbar: yes ")
+  - print progressbar: no ")
+    expect_output(print(kc), expected_output)
 })
 
 test_that("kibior::print, nominal case, args change", {
-  kc_new <- Kibior$new(host = es_endpoint, user = es_username, pwd = es_password, verbose = TRUE)
+  kc_new <- Kibior$new(host = kc$host, user = kc$user, pwd = kc$pwd, verbose = TRUE)
   msg <- paste0("KibioR client: 
-  - host: ", es_endpoint, " 
-  - port: ", es_port, " ")
-  if(!purrr::is_null(es_username)){
+  - host: ", kc$host, " 
+  - port: ", kc$port, " ")
+  if(!purrr::is_null(kc$user)){
     msg <- paste0(msg, "
-  - username: ", es_username, " 
-  - password: ", es_password, " ")
+  - username: ", kc$user, " 
+  - password: ", kc$pwd, " ")
   }
   msg <- paste0(msg, "
   - verbose: yes 

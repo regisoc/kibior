@@ -15,92 +15,17 @@
 library(magrittr)
 library(dplyr)
 
-
-get_elastic_var_from_env <- function(){
-    # env vars
-    env_es_endpoint <- "KIBIOR_BUILD_ES_ENDPOINT"
-    env_es_port     <- "KIBIOR_BUILD_ES_PORT"
-    env_es_username <- "KIBIOR_BUILD_ES_USERNAME"
-    env_es_password <- "KIBIOR_BUILD_ES_PASSWORD"
-    # extract from env var
-    eget <- function(x){
-        x %>% 
-            Sys.getenv() %>% 
-            trimws() %>% 
-            (function(y){ 
-                if(y == "") NULL else y 
-            })
-    }
-    # endpoint
-    es_endpoint <- eget(env_es_endpoint)
-    if(purrr::is_null(es_endpoint)){
-        msg <- "Try loading Kibior tests but lacks Elasticsearch endpoint.\n"
-        msg <- paste0(msg, "Tests and vignettes building require some environment variable to be set.\n")
-        msg <- paste0(msg, " - ", env_es_endpoint, ", default: NULL, REQUIRED\n")
-        msg <- paste0(msg, " - ", env_es_port, ", default: 9200\n")
-        msg <- paste0(msg, " - ", env_es_username, ", default: NULL\n")
-        msg <- paste0(msg, " - ", env_es_password, ", default: NULL\n")
-        msg <- paste0(msg, "It should be local and empty. See documentation for more information.")
-        stop(msg)
-    }
-    message("Elastic endpoint: ", es_endpoint)
-    # port
-    es_port <- tryCatch(
-        {
-            env_es_port %>%
-                eget() %>% 
-                (function(x){ if(purrr::is_null(x)) 9200L else as.integer(x) })
-        },
-        warning = function(w){
-            # coercion of str to int -> NA + warning
-            stop(env_es_port, " must be a number.")
-        }
-    )
-    message("Elastic port: ", es_port)
-    # args
-    args <- list(
-        host = es_endpoint, 
-        port = es_port,  
-        verbose = FALSE
-    )
-    # if auth, add username and pwd in args
-    es_username <- eget(env_es_username)
-    es_password <- eget(env_es_password)
-    if(!purrr::is_null(es_username)){
-        args <- c(
-            args, 
-            list(
-                user = es_username, 
-                pwd = es_password
-            )
-        )
-        message("Elastic username: ", es_username)
-        message("Elastic password: ", es_password)
-    }
-    # return
-    args
-}
-
 message()
 message("----------------------------------")
 message("-- GLOBAL DEFINITION")
 message()
-
 message("Getting build variables from env...")
-# as list
-args <- get_elastic_var_from_env()
 
-#
-kc <- do.call(Kibior$new, args)
+# get kibior var from ".Renviron" file
+dd <- system.file("doc_env", "kibior_build.R", package = "kibior")
+source(dd, local = TRUE)
+kc <- .kibior_get_instance_from_env()
 kc$quiet_progress <- TRUE
-# test if targeted ES is empty before building project
-if(!purrr::is_null(kc$list())){
-    msg <- paste0("Target Elasticsearch '", kc$endpoint, "' is not empty. ")
-    msg <- paste0(msg, "Please, use an empty Elasticsearch instance to build project.")
-    stop(msg)
-}
-message("Kibior build instance: kc")
-
 
 
 # change names to lower and with underscores
@@ -111,7 +36,6 @@ change_names <- function(dataset){
     names(dataset) <- gsub("\\.", "_", names(dataset))
     dataset
 }
-message("Function added: change_names()")
 
 
 mutate_factors <- function(dataset){
@@ -125,15 +49,10 @@ mutate_factors <- function(dataset){
 
 
 single_index_name <- "test_index_single"
-message("Variable added: single_index_name")
 multiple_indice_names <- c("test_index_a", "test_index_b", "test_index_c")
-message("Variable added: multiple_indice_names")
 cpt_loop <- c(10, 100, 1000, 10000)
-message("Variable added: cpt_loop")
 temp_filepath <- tempfile(fileext = ".csv")
-message("Variable added: temp_filepath")
 all_features <- c("aliases", "mappings", "settings")
-message("Variable added: all_features")
 
 
 
@@ -146,14 +65,12 @@ ds <- list(
     # large, 53k records
     "diamonds" = ggplot2::diamonds %>% change_names() %>% mutate_factors()
 )
-message("Variable added: ds - list of 3 datasets")
 
 
 
 ds_random_lines <- ds %>% lapply(function(x){ 
     x[sample(nrow(x), 10), ]
 })
-message("Variable added: ds_random_lines - 10 random lines from each df of 'ds'")
 
 
 # modifications on parts of datasets
@@ -182,7 +99,6 @@ ds_modified <- list(
     "storms" = change_names(st),
     "diamonds" = change_names(d)
 )
-message("Variable added: ds_modified - some modifications on df of 'ds'")
 
 
 
@@ -243,17 +159,12 @@ dept <- list(
     )
 ) %>% dplyr::as_tibble()
 
+# dplyr by
 join_fields <- c("dept_name" = "name")
 
-
-# start <- 1
-# end <- 10
-# ds_join <- list(
-#     gene = LETTERS[seq(from=start, to=end)], 
-#     value = start:end
-#     ) %>% dplyr::as_tibble()
-
-
+# use with quosure "!!"
+query_local <- quo(dept_name %in% c("Finance", "Sales"))
+query_remote <- "dept_name:(finance || sales)"
 
 
 
@@ -267,7 +178,6 @@ remove_all_indices <- function(){
     res <- kc$list()
     if(!purrr::is_null(res)) kc$delete(res)
 }
-message("Function added: remove_all_indices()")
 
 
 count_nb_lines <- function(filepath){
@@ -279,7 +189,6 @@ count_nb_lines <- function(filepath){
     close(f)
     nlines
 }
-message("Function added: count_nb_lines()")
 
 
 produce_str <- function(nb){
@@ -287,7 +196,6 @@ produce_str <- function(nb){
         unlist(use.names = FALSE) %>% 
         paste0(collapse = "")
 }
-message("Function added: produce_str()")
 
 
 push_test_datasets <- function(recreate = TRUE){
@@ -299,18 +207,12 @@ push_test_datasets <- function(recreate = TRUE){
         expect_equal(res, d)
     }
 }
-message("Function added: push_test_datasets()")
-
 
 
 
 
 message()
-message("----------------------------------")
-message()
-
 message("Data will be push to Elasticsearch to setup test env")
-
 message()
 message("----------------------------------")
 message()
