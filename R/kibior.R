@@ -11,7 +11,7 @@
 # limitations under the License.
 
 
-#' Kibior: a lightweight Kibio/Elasticsearch client for R.
+#' Kibior: R client easing data sharing and analysis with Elasticsearch.
 #'
 #' Kibior is a Kibio/Elasticsearch client written with R6 class. 
 #' Instances of Kibior are object that allow to use Elasticsearch power and execute lots of predefined 

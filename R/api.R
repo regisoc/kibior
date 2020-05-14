@@ -49,9 +49,6 @@
 #'
 #' @seealso \code{\link{kibior}}
 #'
-#' @section Constructor: 
-#'  Kibior$new(host = "localhost", port = 9200, user = NULL, pwd = NULL, verbose = FALSE)
-#'
 #' @section Constructor Arguments:
 #'  \tabular{llll}{
 #'  \strong{Argument} \tab \strong{Type} \tab \strong{Details} \tab \strong{Default} \cr
@@ -230,6 +227,7 @@ Kibior <- R6Class(
             "@return the result of the called join"
 
             # TODO: add a "from_instance" param to join between instances
+            # TODO: manage query on in-memory data through `enquo() + !!` ?
             
             # missing ds/index names
             if(missing(left_index)) stop("Missing left dataset/index name.")
@@ -299,7 +297,7 @@ Kibior <- R6Class(
                 index_data <- NULL
                 if(purrr::is_character(index)){
                     # if char, it is the index name needed to be pulled out
-                    message("from index '", index, "'")
+                    if(self$verbose) message("from index '", index, "'")
                     index_data <- self$pull(
                             index_name = index,
                             fields = fields,
@@ -308,8 +306,8 @@ Kibior <- R6Class(
                             max_size = max_size,
                             keep_metadata = keep_metadata
                         )[[index]]
+                    # if keep metadata, remove "_source" prefix in colnames
                     if(keep_metadata){
-                        # if keep metadata, remove "_source" prefix in colnames
                         index_data <- index_data %>% 
                             dplyr::rename_at(
                                 dplyr::vars(dplyr::starts_with('_source.')),
@@ -317,11 +315,12 @@ Kibior <- R6Class(
                                     x %>% lapply(function(y){ 
                                         stringr::str_split(y, "_source.")[[1]][2] 
                                     })
-                                })
+                                }
+                            )
                     }
                 } else {
                     # if data.frame derivative, just load it as tibble
-                    message("from memory")
+                    if(self$verbose) message("from memory")
                     index_data <- index %>%
                         dplyr::select( if(purrr::is_null(fields)) dplyr::everything() else fields ) %>%
                         (function(x){ if(!purrr::is_null(max_size)) head(x, max_size) else x }) %>%
@@ -331,7 +330,7 @@ Kibior <- R6Class(
                 index_data
             }
             # get left
-            message("Getting left ", appendLF = FALSE)
+            if(self$verbose) message("Getting left ", appendLF = FALSE)
             left <- get_data(
                     index = left_index, 
                     fields = left_fields, 
@@ -340,7 +339,7 @@ Kibior <- R6Class(
                     max_size = left_max_size
                 ) 
             # get right
-            message("Getting right ", appendLF = FALSE)
+            if(self$verbose) message("Getting right ", appendLF = FALSE)
             right <- get_data(
                     index = right_index, 
                     fields = right_fields, 
@@ -474,8 +473,12 @@ Kibior <- R6Class(
             if(!is.null(index_name) && !purrr::is_character(index_name)) stop(private$err_param_type_character("index_name", can_be_null = TRUE))
             #
             self$get_metadata(index_name) %>%
-                lapply(function(x){ x[[metadata_type]] }) %>%
-                (function(x){ if(private$is_list_empty(x)) NULL else x})
+                lapply(function(x){ 
+                    x[[metadata_type]]
+                }) %>%
+                (function(x){ 
+                    if(private$is_list_empty(x)) NULL else x
+                })
         },
 
 
@@ -510,11 +513,12 @@ Kibior <- R6Class(
                 switch(xclass,
                     "factor"    = { text_type },
                     "character" = { text_type },
+                    "AsIs"      = { text_type },
                     "numeric"   = { numeric_type },
                     "integer"   = { numeric_type },
                     "double"    = { numeric_type },
                     "list"      = { map_types(x[[1]]) },
-                    stop(private$ERR_WTF, "Unknown type when creating Elasticsearch mapping, found: ", x, " [", xclass, "]")
+                    stop(private$ERR_WTF, " Unknown type when creating Elasticsearch mapping, found: ", x, " [", xclass, "]")
                 )
             }
             # return mapping body
@@ -543,24 +547,30 @@ Kibior <- R6Class(
             mapping <- private$define_mappings(data)
             res <- NULL
             if(self$version$major >= 7){
-                res <- elastic::mapping_create(conn = self$connection,
-                                            index = index_name,
-                                            body = mapping)
+                res <- elastic::mapping_create(
+                    conn = self$connection,
+                    index = index_name,
+                    body = mapping
+                )
             } else {
                 res <- tryCatch(
                     expr = {
                         # do not insert mapping type
-                        elastic::mapping_create(conn = self$connection,
-                                                    index = index_name,
-                                                    body = mapping)
+                        elastic::mapping_create(
+                            conn = self$connection,
+                            index = index_name,
+                            body = mapping
+                        )
                     },
                     error = function(e){
                         # old ES version, try another time with mapping types
-                        elastic::mapping_create(conn = self$connection,
-                                                    index = index_name,
-                                                    type = index_name,
-                                                    include_type_name = TRUE,
-                                                    body = mapping)
+                        elastic::mapping_create(
+                            conn = self$connection,
+                            index = index_name,
+                            type = index_name,
+                            include_type_name = TRUE,
+                            body = mapping
+                        )
                     }
                 )
             }
@@ -1169,20 +1179,23 @@ Kibior <- R6Class(
         #'
         #' @examples
         #' # default initiatlization, connect to "localhost:9200"
-        #' kc <- Kibior$new()
+        #' # kc <- Kibior$new()
         #' # connect to "192.168.2.145:9200"
-        #' kc <- Kibior$new("192.168.2.145")
+        #' # kc <- Kibior$new("192.168.2.145")
         #' # connect to "es:15005", verbose mode activated
-        #' kc <- Kibior$new(host = "elasticsearch", port = 15005, verbose = TRUE)
+        #' # kc <- Kibior$new(host = "elasticsearch", port = 15005, verbose = TRUE)
         #' # connect to "192.168.2.145:9450" with credentials "foo:bar"
-        #' kc <- Kibior$new(host = "192.168.2.145", port = 9450, 
-        #'  user = "foo", pwd = "bar")
+        #' # kc <- Kibior$new(host = "192.168.2.145", port = 9450, user = "foo", pwd = "bar")
         #' # connect to "elasticsearch:9200"
-        #' kc <- Kibior$new("elasticsearch")
+        #' # kc <- Kibior$new("elasticsearch")
+        #' 
+        #' # get kibior var from ".Renviron" file
+        #' dd <- system.file("doc_env", "kibior_build.R", package = "kibior")
+        #' source(dd, local = TRUE)
+        #' kc <- .kibior_get_instance_from_env()
+        #' kc$quiet_progress <- TRUE
         #'
         #' # preparing all examples (do not mind this)
-        #' kc_one <- Kibior$new("elasticsearch", verbose = TRUE)
-        #' kc_two <- Kibior$new("elasticsearch2", verbose = TRUE)
         #' if(kc$has("aaa")) kc$delete("aaa")
         #' if(kc$has("bbb")) kc$delete("bbb")
         #' if(kc$has("ccc")) kc$delete("ccc")
@@ -1193,10 +1206,6 @@ Kibior <- R6Class(
         #' if(kc$has("sw_alderaan")) kc$delete("sw_alderaan")
         #' if(kc$has("sw_from_file")) kc$delete("sw_from_file")
         #' if(kc$has("storms")) kc$delete("storms")
-        #' if(kc_one$has("sw")) kc_one$delete("sw")
-        #' if(kc_one$has("sw_new")) kc_one$delete("sw_new")
-        #' if(kc_two$has("sw")) kc_two$delete("sw")
-        #' if(kc_two$has("sw_new")) kc_two$delete("sw_new")
         #'
         initialize = function(host = "localhost", port = 9200, user = NULL, pwd = NULL, verbose = getOption("verbose")){
             if(purrr::is_null(host)) host <- "localhost"
@@ -1228,7 +1237,6 @@ Kibior <- R6Class(
         #' Print simple informations of the current object.
         #'
         #' @examples
-        #' kc <- Kibior$new("elasticsearch")
         #' print(kc)
         print = function(){
             f <- function(x) if(x) "yes" else "no"
@@ -1254,10 +1262,7 @@ Kibior <- R6Class(
         #' @return TRUE if hosts and ports are identical, else FALSE
         #'
         #' @examples
-        #' kc_one <- Kibior$new("elasticsearch", verbose = TRUE)
-        #' kc_two <- Kibior$new("elasticsearch2", verbose = TRUE)
-        #' kc_one$eq(kc_two)
-        #' kc_two$eq(kc_one)
+        #' kc$eq(kc)
         #' 
         eq = function(other = NULL){
             if(!Kibior$is_instance(other)) stop(private$err_not_kibior_instance("other"))
@@ -1275,10 +1280,7 @@ Kibior <- R6Class(
         #' @return TRUE if hosts and ports are differents, else FALSE
         #'
         #' @examples
-        #' kc_one <- Kibior$new("elasticsearch", verbose = TRUE)
-        #' kc_two <- Kibior$new("elasticsearch2", verbose = TRUE)
-        #' kc_one$ne(kc_two)
-        #' kc_two$ne(kc_one)
+        #' kc$ne(kc)
         #' 
         ne = function(other = NULL){
             r <- !self$eq(other = other)
@@ -1344,7 +1346,7 @@ Kibior <- R6Class(
         #' kc$list()
         #' kc$list(get_specials = TRUE)
         #'
-        #' @param get_special a boolean to get special indices (default: FALSE).
+        #' @param get_specials a boolean to get special indices (default: FALSE).
         #'
         #' @return a list of index names, NULL if no index found
         #'
@@ -1400,8 +1402,9 @@ Kibior <- R6Class(
         #' 
         delete = function(index_name = NULL){
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
-            if(index_name == "_all" || index_name == "*") stop("Cannot delete all index at once.")
             if("_all" %in% index_name) stop("Cannot delete all indices at once.")
+            if("*" %in% index_name) stop("Cannot delete all indices at once.")
+            #
             res <- list()
             for(i in index_name){
                 if(self$verbose) message("Deleting index '", i, "'")
@@ -1482,16 +1485,14 @@ Kibior <- R6Class(
             if(purrr::is_null(index_name)) index_name <- "_all"
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name", can_be_null = TRUE))
             res <- NULL
-            m <- tryCatch(
-                {
-                    r <- suppressWarnings(elastic::index_get(self$connection, 
-                                    index = index_name,
-                                    include_type_name = FALSE, 
-                                    verbose = self$verbose))
-                }, 
-                warning = function(w){},    # do nothing, just capture the warning
-                finally = { r }             # return the result, warnings or not
-            )
+            m <- suppressWarnings({
+                elastic::index_get(
+                    self$connection, 
+                    index = index_name,
+                    include_type_name = FALSE, 
+                    verbose = self$verbose
+                )
+            })
             if(length(m) > 0){
                 res <- m
             }
@@ -1515,6 +1516,14 @@ Kibior <- R6Class(
         get_mappings = function(index_name = NULL){
             res <- private$get_metadata_type(metadata_type = "mappings", 
                                         index_name = index_name)
+            if(!purrr::is_null(res)){
+                # remove type call
+                if(self$version$major < 7){
+                    res <- res %>% lapply(function(x){ 
+                        if(purrr::is_null(x) || length(x) == 0) x else x[[1]] 
+                    })
+                }
+            }
             if(self$quiet_results) invisible(res) else res
         },
 
@@ -1669,11 +1678,7 @@ Kibior <- R6Class(
                 r
             }
             for(i in names(tmp)){
-                if(self$version$major > 6){
-                    res[[i]] <- get_property_names(tmp, i)
-                } else {
-                    res[[i]] <- get_property_names(tmp[[i]], i)
-                }
+                res[[i]] <- get_property_names(tmp, i)
             }
             if(length(res) == 0){
                 res <- NULL
@@ -1742,8 +1747,9 @@ Kibior <- R6Class(
         #' @family data-manipulation
         #'
         #' @examples
-        #' bam_param <- ScanBamParam(what = c("pos", "qwidth"))
-        #' bam_data <- Rsamtools::scanBam(ff, param = bam_param)
+        #' dd_bai <- system.file("extdata", "test.bam.bai", package = "kibior")
+        #' bam_param <- Rsamtools::ScanBamParam(what = c("pos", "qwidth"))
+        #' bam_data <- Rsamtools::scanBam(dd_bai, param = bam_param)
         #' kc$bam_to_tibble(bam_data)
         #'
         #' @param bam_data data from a BAM file (default: NULL).
@@ -1786,7 +1792,7 @@ Kibior <- R6Class(
         #' @family move-data
         #'
         #' @examples
-        #' f = tempfile(fileext=".csv")
+        #' f <- tempfile(fileext=".csv")
         #' # export and overwrite last file with the same data from Elasticsearch
         #' kc$export(data = "sw", filepath = f)
         #' # export from in-memory data to a file
@@ -1829,7 +1835,7 @@ Kibior <- R6Class(
         #' # import to in-memory variable
         #' kc$import_tabular(filepath = f)
         #' # import raw data
-        #' kc$import_tabular(filepath = f, as_tibble = FALSE)
+        #' kc$import_tabular(filepath = f, to_tibble = FALSE)
         #'
         #' @param filepath the filepath to use as import, must contain the file extention (default: 
         #'  NULL).
@@ -1858,16 +1864,15 @@ Kibior <- R6Class(
         #' @family move-data
         #'
         #' @examples
-        #' f_bed <- tempfile(fileext = ".bed")
-        #' f_gff <- tempfile(fileext = ".gff3.gz")
-        #' download.file("https://s3.amazonaws.com/bedtools-tutorials/web/cpg.bed", f_bed)
-        #' download.file("ftp://ftp.ensembl.org/pub/release-99/gff3/homo_sapiens/Homo_sapiens.GRCh38.99.chromosome.Y.gff3.gz", f_gff)
+        #' # get sample files
+        #' f_gff <- system.file("extdata", "chr_y.gff3.gz", package = "kibior")
+        #' f_bed <- system.file("extdata", "cpg.bed", package = "kibior")
         #' # import to in-memory variable
         #' kc$import_features(filepath = f_bed)
         #' kc$import_features(filepath = f_gff)
         #' # import raw data
-        #' kc$import_features(filepath = f_bed, as_tibble = FALSE)
-        #' kc$import_features(filepath = f_gff, as_tibble = FALSE)
+        #' kc$import_features(filepath = f_bed, to_tibble = FALSE)
+        #' kc$import_features(filepath = f_gff, to_tibble = FALSE)
         #'
         #' @param filepath the filepath to use as import, must contain the file extention (default: 
         #'  NULL).
@@ -1881,9 +1886,9 @@ Kibior <- R6Class(
             rtracklayer::import(filepath) %>% 
                 (function(features){
                     if(to_tibble){
-                        table <- dplyr::as_tibble(table, .name_repair = "unique")
+                        features <- dplyr::as_tibble(features, .name_repair = "unique")
                     }
-                    table
+                    features
                 })
         },
 
@@ -1894,12 +1899,12 @@ Kibior <- R6Class(
         #' @family move-data
         #'
         #' @examples
-        #' f <- tempfile(fileext = ".bam")
-        #' download.file("http://hgdownload.cse.ucsc.edu/goldenPath/hg19/encodeDCC/wgEncodeUwRepliSeq/wgEncodeUwRepliSeqK562G1AlnRep1.bam", f)
+        #' # get sample file
+        #' f_bai <- system.file("extdata", "test.bam.bai", package = "kibior")
         #' # import to in-memory variable
-        #' kc$import_alignments(filepath = f)
+        #' kc$import_alignments(filepath = f_bai)
         #' # import raw data
-        #' kc$import_alignments(filepath = f, as_tibble = FALSE)
+        #' kc$import_alignments(filepath = f_bai, to_tibble = FALSE)
         #'
         #' @param filepath the filepath to use as import, should contain the file extention (default: 
         #'  NULL).
@@ -1920,127 +1925,102 @@ Kibior <- R6Class(
 
         #' @details
         #' Import method for sequences data.
-        #' Works with FASTA and FASTQ formats.
+        #' Works with FASTA formats.
         #'
         #' @family move-data
         #'
         #' @examples
-        #' f <- tempfile(fileext = ".bam")
-        #' download.file("http://hgdownload.cse.ucsc.edu/goldenPath/hg19/encodeDCC/wgEncodeUwRepliSeq/wgEncodeUwRepliSeqK562G1AlnRep1.bam", f)
+        #' # get sample file
+        #' f_dna <- system.file("extdata", "dna_human_y.fa.gz", package = "kibior")
+        #' f_rna <- system.file("extdata", "ncrna_mus_musculus.fa.gz", package = "kibior")
+        #' f_aa <- system.file("extdata", "pep_mus_spretus.fa.gz", package = "kibior")
         #' # import to in-memory variable
-        #' kc$import_alignments(filepath = f)
+        #' kc$import_sequences(filepath = f_dna, fasta_type = "dna")
         #' # import raw data
-        #' kc$import_alignments(filepath = f, as_tibble = FALSE)
+        #' kc$import_sequences(filepath = f_rna, to_tibble = FALSE, fasta_type = "rna")
+        #' # import auto
+        #' kc$import_sequences(filepath = f_aa)
         #'
         #' @param filepath the filepath to use as import, should contain the file extention (default: 
         #'  NULL).
         #' @param to_tibble returns the result as tibble? If FALSE, the raw default 
         #'  Rsamtools::scanBam() format will be used (default: TRUE).
+        #' @param fasta_type type of parsing. It can be "dna", "rna", "aa" ou "auto" (default: "auto")
         #'
         #' @return data contained in the file as a tibble, or NULL.
         #'
-        import_sequences = function(filepath = NULL, to_tibble = TRUE, type = "fasta", fasta_type = "auto"){
-            if(!(type %in% c("fasta", "fastq"))) stop("Need type 'fasta' or 'fastq'.")
+        import_sequences = function(filepath = NULL, to_tibble = TRUE, fasta_type = "auto"){
+            if(!(fasta_type %in% c("auto", "dna", "rna", "aa"))){
+                stop("Needed fasta_type to be one of 'dna', 'rna','aa' ou 'auto'")
+            }
+            # add parameter (, with.qualities=FALSE) for readXStringSet function
             # check pkg
             Kibior$.install_packages("Biostrings")
-            # run fasta
-            if(type == "fasta"){
-                # methods
-                string_set_to_df <- function(ss){
-                    data.frame(
-                        width = Biostrings::width(ss), 
-                        seq = as.character(ss), 
-                        names = names(ss)
-                    )
-                }
-                dna_method <- Biostrings::readDNAStringSet
-                rna_method <- Biostrings::readRNAStringSet
-                aa_method <- Biostrings::readAAStringSet
-                # file exists?
-                if(!file.exists(filepath)){
-                    f <- tempfile()
-                    download.file(filepath, f)
-                } else {
-                    f <- filepath
-                }
-                # select mode
-                r <- switch(fasta_type,
-                    "dna"   = { dna_method(f) },
-                    "rna"   = { rna_method(f) },
-                    "aa"    = { aa_method(f) },
-                    "auto"  = function(){
-                        if(self$verbose) message("  Auto-mode [on]")
-                        tryCatch({
-                                # try dna
-                                if(self$verbose) message("  - Try [DNA] parsing...")
-                                dna_method(f)
-                            }, 
-                            warning = function(e){
-                                tryCatch({
-                                        # try rna
-                                        if(self$verbose) message("  - Try [RNA] parsing...")
-                                        rna_method(f)
-                                    },
-                                    warning = function(ee){
-                                        tryCatch({
-                                                # try prot
-                                                if(self$verbose) message("  - Try [AA] parsing...")
-                                                aa_method(f)
-                                            },
-                                            warning = function(eee){
-                                                stop("Cannot apply 'Biostrings' to filepath.")
-                                            }
-                                        )
-                                    }
-                                )
-                            }
-                        )
-                    },
-                    stop("Unknown fasta option '", fasta_type, "'.")
+            # methods
+            string_set_to_df <- function(ss){
+                data.frame(
+                    width = Biostrings::width(ss), 
+                    seq = as.character(ss), 
+                    names = names(ss)
                 )
-                # tibble
-                if(to_tibble){
-                    r <- r %>%
-                        string_set_to_df() %>% 
-                        dplyr::as_tibble(.name_repair = "unique")
-                }
-                r
-
-            # } else {
-            #     # run fastq
-            #     Kibior$.install_packages("ShortRead")
-            #     f <- tempfile()
-            #     download.file(filepath, destfile = f)
-            #     r <- ShortRead::readFastq(f)
-            #     unlink(f)
-            #     if(to_tibble){
-            #         if(self$verbose) message("Argument `to_tibble` not taken into accoutn fo fastq data.")
-            #     }
-            #     r
             }
+            # file exists?
+            if(!file.exists(filepath)){
+                f <- tempfile()
+                download.file(filepath, f)
+            } else {
+                f <- filepath
+            }
+            # select mode
+            r <- switch(fasta_type,
+                "dna"   = { Biostrings::readDNAStringSet(f) },
+                "rna"   = { Biostrings::readRNAStringSet(f) },
+                "aa"    = { Biostrings::readAAStringSet(f) },
+                "auto"  = { Biostrings::readBStringSet(f) },
+                stop("Unknown fasta option '", fasta_type, "'.")
+            )
+            # tibble
+            if(to_tibble){
+                r <- r %>%
+                    string_set_to_df() %>% 
+                    dplyr::as_tibble(.name_repair = "unique")
+            }
+            r
         },
 
-        # TODO: import_variants
-        # Kibior$import_variants <- function(filepath){
-        #     # TODO return tibble if possible
-        #     Kibior$.install_packages("VariantAnnotation")
-        #     s <- VariantAnnotation::readVcf(filepath)
-        #     s %>% 
-        #         VariantAnnotation::info() %>% 
-        #         as.data.frame(stringsAsFactors = FALSE) %>% 
-        #         dplyr::as_tibble()
-        # }
-
-        # TODO: import_ms
-        # Kibior$import_ms <- function(filepath){
-        #     # TODO return tibble if possible
-        #     Kibior$.install_packages("MSnbase")
-        #     # read{MS/Mgf}Data
-        #     # MSnbase::read{MS/Mgf}Data(filepath)
-        # }
-
-
+        #' @details
+        #' Import method that will try to guess importation method.
+        #' Will also try to read from compressed data if they are.
+        #' This method will call other import_* methods when trying.
+        #' Some data formats are not installed by default.
+        #' Use `rio::install_formats()` to be able to parse them.
+        #'
+        #' @family move-data
+        #'
+        #' @examples
+        #' # get sample file
+        #' f_dna <- system.file("extdata", "dna_human_y.fa.gz", package = "kibior")
+        #' f_rna <- system.file("extdata", "ncrna_mus_musculus.fa.gz", package = "kibior")
+        #' f_aa <- system.file("extdata", "pep_mus_spretus.fa.gz", package = "kibior")
+        #' f_bai <- system.file("extdata", "test.bam.bai", package = "kibior")
+        #' f_gff <- system.file("extdata", "chr_y.gff3.gz", package = "kibior")
+        #' f_bed <- system.file("extdata", "cpg.bed", package = "kibior")
+        #' # import 
+        #' kc$guess_import(f_dna)
+        #' kc$guess_import(f_rna)
+        #' kc$guess_import(f_aa)
+        #' kc$guess_import(f_bai)
+        #' kc$guess_import(f_gff)
+        #' kc$guess_import(f_bed)
+        #'
+        #' @param filepath the filepath to use as import, must contain the file extention (default: 
+        #'  NULL).
+        #' @param to_tibble returns the result as tibble? (default: TRUE).
+        #'
+        #' @return data contained in the file, or NULL.
+        #'
         guess_import = function(filepath = NULL, to_tibble = TRUE){
+            # 
             guess_import_method <- function(f, rm_compression_extension = FALSE){
                 "f can be an url or a fs path."
                 "rm_compression_extension = TRUE will try to remove the first layer"
@@ -2079,11 +2059,7 @@ Kibior <- R6Class(
                             "features"  = { self$import_features },
                             "alignments"= { self$import_alignments },
                             "sequences" = { self$import_sequences },
-                            "reads"     = { 
-                                args[["type"]] = "fastq"
-                                self$import_sequences
-                            },
-                            stop(private$ERR_WTF)
+                            stop(paste0(private$ERR_WTF, "\nFound type: ", type, "\n"))
                         )
                         do.call(what = m, args = args)
                     })
@@ -2109,25 +2085,28 @@ Kibior <- R6Class(
         },
 
         #' @details
-        #' Generic import method, will try to guess importation method.
-        #' Will also try to uncompress data if they are.
+        #' Generic import method.
         #' This method will call other import_* methods when trying.
         #' Some data formats are not installed by default.
-        #' Use `rio::install_formats()` to be able to parse them.
         #'
         #' @family move-data
         #'
         #' @examples
-        #' # import to in-memory variable (data)
-        #' data <- kc$import(filepath = f)
+        #' # get sample file
+        #' f_aa <- system.file("extdata", "pep_mus_spretus.fa.gz", package = "kibior")
+        #' f_gff <- system.file("extdata", "chr_y.gff3.gz", package = "kibior")
+        #' f_bai <- system.file("extdata", "test.bam.bai", package = "kibior")
+        #' # import 
+        #' kc$import(filepath = f_aa)
         #' # import to Elasticsearch index ("sw_from_file") if not exists
-        #' data <- kc$import(filepath = f, import_mode = "remote", push_index = "sw_from_file")
+        #' kc$import(filepath = f_bai, import_mode = "remote", push_index = "sw_from_file")
         #' # import to index by recreating it, then pull indexed data
-        #' data <- kc$import(filepath = f, import_mode = "remote", push_index = "sw_from_file", 
+        #' kc$import(filepath = f_gff, import_mode = "remote", push_index = "sw_from_file",
         #'  push_mode = "recreate")
         #'
         #' @param filepath the filepath to use as import, must contain the file extention (default: 
         #'  NULL).
+        #' @param import_type can be one of "auto", "tabular", "features", "alignments", "sequences" (default: "auto").
         #' @param import_mode can be "local" to get file data, "remote" to immediatly push them to 
         #'  Elasticsearch, "both" to push and pull. (default: "local").
         #' @param push_index the name of the index where to push data (default: NULL).
@@ -2135,7 +2114,7 @@ Kibior <- R6Class(
         #' @param id_col the column name of unique IDs (default: NULL).
         #' @param to_tibble returns the result as tibble? (default: TRUE).
         #'
-        #' @return data contained in the file as a tibble, or NULL.
+        #' @return data contained in the file, or NULL.
         #'
         import = function(filepath = NULL, import_type = "auto", import_mode = "local", push_index = NULL, push_mode = "check", id_col = NULL, to_tibble = TRUE){
             if(!purrr::is_character(filepath)) stop(private$err_param_type_character("filepath"))
@@ -2163,19 +2142,25 @@ Kibior <- R6Class(
             data <- m(filepath = filepath, to_tibble = to_tibble)
             # check/push
             no_data <- { dim(data) == c(0, 0) } %>% all()
-            if(no_data && self$verbose) message("No data found.")
             res <- NULL
-            # import mode
-            if(import_mode == "local"){
-                # local
-                res <- data
+            if(no_data) {
+                if(self$verbose) message("No data found.")
             } else {
-                # remote (NULL) or both
-                r <- kc$push(data = data, index_name = push_index, mode = push_mode, id_col = id_col)
-                if(r != push_index) stop("Something went wrong when pushing data.")
-                if(import_mode == "both") {
-                    res <- kc$pull(push_index)[[push_index]]
-                }
+                # import mode
+                res <- switch(import_mode,
+                    "local" = { 
+                        data
+                    },
+                    "remote" = {
+                        self$push(data = data, index_name = push_index, mode = push_mode, id_col = id_col)
+                    },
+                    "both" = {
+                        r <- self$push(data = data, index_name = push_index, mode = push_mode, id_col = id_col)
+                        if(r != push_index) stop("Something went wrong when pushing data.")
+                        self$pull(push_index)[[push_index]]
+                    },
+                    stop(private$ERR_WTF)
+                )
             }
             if(self$quiet_results) invisible(res) else res
         },
@@ -2266,7 +2251,9 @@ Kibior <- R6Class(
                 res <- self$create(index_name = index_name, force = (mode == "recreate"))
                 if(!res[[index_name]]$acknowledged) stop("Index not created.")
                 # define mapping based on data type
-                mapping_res <- private$create_mappings(index_name = index_name, data = data)
+                mapping_res <- suppressWarnings({ 
+                    private$create_mappings(index_name = index_name, data = data)
+                })
                 if(purrr::is_null(mapping_res) || !mapping_res$acknowledged) stop("Cannot apply mapping to '", index_name, "'.")
             }
             # prepare
@@ -2279,6 +2266,11 @@ Kibior <- R6Class(
                         doc_ids = ids,
                         quiet = self$quiet_progress,
                         query = list(refresh = "wait_for"))
+            # before v7, need arg type
+            if(self$version$major < 7){
+                args[["type"]] = "_doc"
+            }
+            # choose bulk method
             bulk_method <- NULL
             if(mode != "update"){
                 # if id_col not defined by the user, Elasticsearch will give ids automatically
@@ -2289,7 +2281,10 @@ Kibior <- R6Class(
             }
             # Time the bulk send
             clock_start <- proc.time()
-            bulks_res <- do.call(bulk_method, args)
+            bulks_res <- suppressWarnings({ 
+                # suppress warnings caused by type removal deprecation in ES 6 and 7
+                do.call(bulk_method, args) 
+            })
             elapsed <- proc.time() - clock_start
             # verbose
             if(self$verbose){
@@ -2326,8 +2321,8 @@ Kibior <- R6Class(
         #' # get only "name" and "status" fields of indices starting with "s"
         #' # fields not found will be ignored
         #' kc$pull("s*", fields = c("name", "status"))
-        #' # limit the size of the result to 3
-        #' kc$pull("storms", max_size = 3)
+        #' # limit the size of the result to 10
+        #' kc$pull("storms", max_size = 10, bulk_size = 10)
         #' # use Elasticsearch query syntax to select and filter on all indices, for all data
         #' # Here, we want to search for all records taht match the conditions:
         #' # field "height" is strictly more than 180 AND field homeworld is "Tatooine" OR "Naboo"
@@ -2370,7 +2365,6 @@ Kibior <- R6Class(
             if(self$quiet_results) invisible(do.call(self$search, args)) else do.call(self$search, args)
         },
 
-        # TODO test
         #'
         #' @details
         #' Move data from one index to another.
@@ -2379,20 +2373,11 @@ Kibior <- R6Class(
         #' @family move-data
         #'
         #' @examples
-        #' kc_one <- Kibior$new("elasticsearch", verbose = TRUE)
-        #' kc_two <- Kibior$new("elasticsearch2", verbose = TRUE)
-        #' kc_one$push(dplyr::starwars, "sw", mode = "recreate")
+        #' kc$push(dplyr::starwars, "sw", mode = "recreate")
         #' # move data from an index to another (change name, same instance)
-        #' r <- kc_one$move(from_index = "sw", to_index = "sw_new")
-        #' # copy data from an index to another (same instance)
-        #' r <- kc_one$move(from_index = "sw_new", to_index = "sw", copy = TRUE)
-        #' kc_one$pull(c("sw","sw_new"))
-        #' # copy data from an instance to another
-        #' r <- kc_two$move(from_instance = kc_one, from_index = "sw_new", to_index = "sw", copy = TRUE)
-        #' # list instances
-        #' kc_one$list() 
-        #' kc_two$list() 
-        #' kc_two$pull("sw")
+        #' r <- kc$move(from_index = "sw", to_index = "sw_new")
+        #' kc$pull("sw_new")
+        #' kc$list() 
         #'
         #' @param from_instance If not NULL, the Kibior object of another instance. if NULL 
         #'  (default), this instance will be used. (default: NULL).
@@ -2487,15 +2472,9 @@ Kibior <- R6Class(
         #'
         #' @examples
         #' # copy data from one index to another (same instance)
-        #' r <- kc_one$copy(from_index = "sw", to_index = "sw2")
-        #' kc_one$pull(c("sw", "sw2"))
-        #' # copy data from an instance to another
-        #' r <- kc_two$copy(from_instance = kc_one, from_index = "sw2", to_index = "sw2", force = TRUE)
-        #' # list instances
-        #' kc_one$list() 
-        #' kc_two$list() 
-        #' kc_two$pull(c("sw2"))
-        #'
+        #' r <- kc$copy(from_index = "sw_new", to_index = "sw")
+        #' kc$pull(c("sw", "sw_new"))
+        #' kc$list() 
         #'
         #' @param from_instance If not NULL, the Kibior object of another instance. if NULL 
         #'  (default), this instance will be used. (default: NULL).
@@ -2524,22 +2503,6 @@ Kibior <- R6Class(
         # methods - Search
         # --------------------------------------------------------------------------
 
-        
-        # b <- list(
-        #     "aggs" = list(
-        #         "agg_name" = list(
-        #             "terms" = list(
-        #                 "field" = "name.keyword"
-        #             )
-        #         )
-        #     )
-        # )
-        # elastic::Search(kc$connection, size=0, asdf=TRUE, body = b) %>% 
-        #     .[["aggregations"]] %>% 
-        #     .[["agg_name"]] %>% 
-        #     .[["buckets"]] %>% 
-        #     dplyr::as_tibble()
-
 
         #' @details
         #' Search data from Elasticsearch.
@@ -2559,7 +2522,7 @@ Kibior <- R6Class(
         #' # if an index does not have the "name" field, it will be empty
         #' kc$search("s*", fields = "name")
         #' # limit the size of the result to 50 to the whole index
-        #' kc$search("storms", max_size = 50, head = FALSE)
+        #' kc$search("storms", max_size = 50, bulk_size = 50, head = FALSE)
         #' # use Elasticsearch query syntax to select and filter on all indices, for all data
         #' # Here, we want to search for all records taht match the conditions:
         #' # field "height" is strictly more than 180 AND field homeworld is "Tatooine" OR "Naboo"
@@ -2996,9 +2959,9 @@ Kibior <- R6Class(
         #' sup_carat <- dplyr::filter(ggplot2::diamonds, carat > 3.5)
         #' r <- kc$push(sup_carat, "diamonds_superior")
         #' # execute a inner_join with one index and one in-memory dataset
-        #' kc$inner_join(left_index = ggplot2::diamonds, right_index = "diamonds_superior")
+        #' kc$inner_join(ggplot2::diamonds, "diamonds_superior")
         #' # execute a inner_join with one index queried, and one in-memory dataset
-        #' kc$inner_join(left_index = ggplot2::diamonds, right_index = "diamonds", right_query 
+        #' kc$inner_join(ggplot2::diamonds, "diamonds", right_query 
         #'  = "carat:>3.5")
         #'
         #' @return a tibble
@@ -3023,10 +2986,9 @@ Kibior <- R6Class(
         #' fair_cut <- dplyr::filter(ggplot2::diamonds, cut == "Fair")  # 1605 lines
         #' sup_carat <- kc$pull("diamonds_superior")$diamonds_superior
         #' # execute a full_join with one index and one in-memory dataset
-        #' kc$full_join(left_index = fair_cut, right_index = "diamonds_superior")
+        #' kc$full_join(fair_cut, "diamonds_superior")
         #' # execute a full_join with one index queried, and one in-memory dataset
-        #' kc$full_join(left_index = sup_carat, right_index = "diamonds", right_query 
-        #'  = "cut:fair")
+        #' kc$full_join(sup_carat, "diamonds", right_query = "cut:fair")
         #'
         #' @return a tibble
         #'
@@ -3050,9 +3012,9 @@ Kibior <- R6Class(
         #' fair_cut <- dplyr::filter(ggplot2::diamonds, cut == "Fair")  # 1605 lines
         #' sup_carat <- kc$pull("diamonds_superior")$diamonds_superior
         #' # execute a left_join with one index and one in-memory dataset
-        #' kc$left_join(left_index = fair_cut, right_index = "diamonds_superior")
+        #' kc$left_join(fair_cut, "diamonds_superior")
         #' # execute a left_join with one index queried, and one in-memory dataset
-        #' kc$left_join(left_index = sup_carat, right_index = "diamonds", right_query 
+        #' kc$left_join(sup_carat, "diamonds", right_query 
         #'  = "cut:fair")
         #'
         #' @return a tibble
@@ -3077,9 +3039,9 @@ Kibior <- R6Class(
         #' fair_cut <- dplyr::filter(ggplot2::diamonds, cut == "Fair")  # 1605 lines
         #' sup_carat <- kc$pull("diamonds_superior")$diamonds_superior
         #' # execute a right_join with one index and one in-memory dataset
-        #' kc$right_join(left_index = fair_cut, right_index = "sup_carat")
+        #' kc$right_join(fair_cut, "diamonds_superior")
         #' # execute a right_join with one index queried, and one in-memory dataset
-        #' kc$right_join(left_index = sup_carat, right_index = "diamonds", right_query 
+        #' kc$right_join(sup_carat, "diamonds", right_query 
         #'  = "cut:fair")
         #'
         #' @return a tibble
@@ -3104,9 +3066,9 @@ Kibior <- R6Class(
         #' fair_cut <- dplyr::filter(ggplot2::diamonds, cut == "Fair")  # 1605 lines
         #' sup_carat <- kc$pull("diamonds_superior")$diamonds_superior
         #' # execute a semi_join with one index and one in-memory dataset
-        #' kc$semi_join(left_index = fair_cut, right_index = "diamonds_superior")
+        #' kc$semi_join(fair_cut, "diamonds_superior")
         #' # execute a semi_join with one index queried, and one in-memory dataset
-        #' kc$semi_join(left_index = sup_carat, right_index = "diamonds", right_query 
+        #' kc$semi_join(sup_carat, "diamonds", right_query 
         #'  = "cut:fair")
         #'
         #' @return a tibble
@@ -3131,10 +3093,14 @@ Kibior <- R6Class(
         #' fair_cut <- dplyr::filter(ggplot2::diamonds, cut == "Fair")  # 1605 lines
         #' sup_carat <- kc$pull("diamonds_superior")$diamonds_superior
         #' # execute a anti_join with one index and one in-memory dataset
-        #' kc$anti_join(left_index = fair_cut, right_index = "diamonds_superior")
+        #' kc$anti_join(fair_cut, "diamonds_superior")
         #' # execute a anti_join with one index queried, and one in-memory dataset
-        #' kc$anti_join(left_index = sup_carat, right_index = "diamonds", right_query 
+        #' kc$anti_join(sup_carat, "diamonds", right_query 
         #'  = "cut:fair")
+        #' # 
+        #' # Do not mind this, removing example indices
+        #' elastic::index_delete(kc$connection, "*")
+        #' kc <- NULL
         #'
         #' @return a tibble
         #'
