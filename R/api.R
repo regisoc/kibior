@@ -241,6 +241,17 @@ Kibior <- R6Class(
             # metadata
             if(!purrr::is_logical(keep_metadata)) stop(private$err_param_type_logical("keep_metadata"))
             if(is.na(keep_metadata)) stop(private$err_logical_na("keep_metadata"))
+            # add columns from "by" to the left and right fields if not present
+            if(!purrr::is_null(left_fields)){
+                # get "by" left index column names
+                by_left_fields <- by %>% as.list() %>% names()
+                left_fields <- c(left_fields, by_left_fields)
+            }
+            if(!purrr::is_null(right_fields)){
+                # get "by" right index column names
+                by_right_fields <- by %>% as.list() %>% unlist(use.names = FALSE)
+                right_fields <- c(right_fields, by_right_fields)
+            }
             # side args check (left and right)
             check_side_args <- function(side){
                 #
