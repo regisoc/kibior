@@ -467,12 +467,12 @@ Kibior <- R6Class(
         },
 
 
-        get_metadata_type = function(metadata_type = NULL, index_name = NULL){
+        metadata_type = function(metadata_type = NULL, index_name = NULL){
             if(!purrr::is_character(metadata_type)) stop(private$err_param_type_character("metadata_type"))
             if(length(metadata_type) > 1) stop(private$err_one_value("metadata_type"))
             if(!is.null(index_name) && !purrr::is_character(index_name)) stop(private$err_param_type_character("index_name", can_be_null = TRUE))
             #
-            self$get_metadata(index_name) %>%
+            self$metadata(index_name) %>%
                 lapply(function(x){ 
                     x[[metadata_type]]
                 }) %>%
@@ -1233,6 +1233,7 @@ Kibior <- R6Class(
             private$connect()
         },
 
+
         #' @details
         #' Print simple informations of the current object.
         #'
@@ -1252,6 +1253,7 @@ Kibior <- R6Class(
             cat("  - print progressbar:", f(!self$quiet_progress), "\n")
         },
 
+
         # TODO test
         #'
         #' @details
@@ -1269,6 +1271,7 @@ Kibior <- R6Class(
             r <- (self$host == other$host && self$port == other$port)
             if(self$quiet_results) invisible(r) else r
         },
+
 
         # TODO test
         #'
@@ -1337,6 +1340,7 @@ Kibior <- R6Class(
             if(self$quiet_results) invisible(res) else res
         },
 
+
         #' @details
         #' List indices in Elasticsearch.
         #'
@@ -1351,13 +1355,14 @@ Kibior <- R6Class(
         #' @return a list of index names, NULL if no index found
         #'
         list = function(get_specials = FALSE){
-            r <- names(self$get_mappings())
+            r <- names(self$mappings())
             if(!purrr::is_null(r) && !get_specials){
                 # remove special indices
                 r <- r[!startsWith(r, ".")]
             }
             if(self$quiet_results) invisible(r) else r
         },
+
 
         #' @details
         #' Does Elasticsearch has one or several indices?
@@ -1386,6 +1391,7 @@ Kibior <- R6Class(
             }
             if(self$quiet_results) invisible(res) else res
         },
+
 
         #' @details
         #' Delete one or several indices in Elasticsearch.
@@ -1441,6 +1447,7 @@ Kibior <- R6Class(
             if(self$quiet_results) invisible(r) else r
         },
 
+
         #' @details
         #' Ping cluster connection
         #'
@@ -1472,16 +1479,16 @@ Kibior <- R6Class(
         #' kc$push(dplyr::filter(dplyr::starwars, homeworld == "Naboo"), "sw_naboo")
         #' kc$push(dplyr::filter(dplyr::starwars, homeworld == "Tatooine"), "sw_tatooine")
         #' kc$push(dplyr::filter(dplyr::starwars, homeworld == "Alderaan"), "sw_alderaan")
-        #' # get_metadata
-        #' kc$get_metadata()
-        #' kc$get_metadata("sw")
-        #' kc$get_metadata(c("sw", "sw_naboo"))
+        #' # metadata
+        #' kc$metadata()
+        #' kc$metadata("sw")
+        #' kc$metadata(c("sw", "sw_naboo"))
         #'
         #' @param index_name a vector of index names to get metadata (default: NULL).
         #'
         #' @return the list of indices, each containing the 3 features (mappings,settings, aliases) 
         #'
-        get_metadata = function(index_name = NULL){
+        metadata = function(index_name = NULL){
             if(purrr::is_null(index_name)) index_name <- "_all"
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name", can_be_null = TRUE))
             res <- NULL
@@ -1499,22 +1506,23 @@ Kibior <- R6Class(
             if(self$quiet_results) invisible(res) else res
         },
 
+
         #' @details
         #' Get mappings of indices
         #'
         #' @family crud-metadata
         #'
         #' @examples
-        #' kc$get_mappings()
-        #' kc$get_mappings("sw")
-        #' kc$get_mappings(c("sw", "sw_naboo"))
+        #' kc$mappings()
+        #' kc$mappings("sw")
+        #' kc$mappings(c("sw", "sw_naboo"))
         #'
         #' @param index_name a vector of index names to get mappings (default: NULL).
         #'
         #' @return the list of indices, containing their mapping
         #'
-        get_mappings = function(index_name = NULL){
-            res <- private$get_metadata_type(metadata_type = "mappings", 
+        mappings = function(index_name = NULL){
+            res <- private$metadata_type(metadata_type = "mappings", 
                                         index_name = index_name)
             if(!purrr::is_null(res)){
                 # remove type call
@@ -1527,25 +1535,27 @@ Kibior <- R6Class(
             if(self$quiet_results) invisible(res) else res
         },
 
+
         #' @details
         #' Get settings of indices
         #'
         #' @family crud-metadata
         #'
         #' @examples
-        #' kc$get_settings()
-        #' kc$get_settings("sw")
-        #' kc$get_settings(c("sw", "sw_tatooine"))
+        #' kc$settings()
+        #' kc$settings("sw")
+        #' kc$settings(c("sw", "sw_tatooine"))
         #'
         #' @param index_name a vector of index names to get settings (default: NULL).
         #'
         #' @return the list of indices, containing their settings
         #'
-        get_settings = function(index_name = NULL){
-            res <- private$get_metadata_type(metadata_type = "settings", 
+        settings = function(index_name = NULL){
+            res <- private$metadata_type(metadata_type = "settings", 
                                             index_name = index_name)
             if(self$quiet_results) invisible(res) else res
         },
+
 
         #' @details
         #' Get aliases of indices
@@ -1553,19 +1563,20 @@ Kibior <- R6Class(
         #' @family crud-metadata
         #'
         #' @examples
-        #' kc$get_aliases()
-        #' kc$get_aliases("sw")
-        #' kc$get_aliases(c("sw", "sw_alderaan"))
+        #' kc$aliases()
+        #' kc$aliases("sw")
+        #' kc$aliases(c("sw", "sw_alderaan"))
         #'
         #' @param index_name a vector of index names to get aliases (default: NULL).
         #'
         #' @return the list of indices, containing their aliases
         #'
-        get_aliases = function(index_name = NULL){ 
-            res <- private$get_metadata_type(metadata_type = "aliases", 
+        aliases = function(index_name = NULL){ 
+            res <- private$metadata_type(metadata_type = "aliases", 
                                             index_name = index_name)
             if(self$quiet_results) invisible(res) else res
         },
+
 
         #' @details
         #' Count observations or variables in Elasticsearch data
@@ -1605,7 +1616,7 @@ Kibior <- R6Class(
                         elastic::count(self$connection, index = i, q = query)
                     },
                     "variables" = {
-                        self$fields(i)[[i]] %>% length()
+                        self$columns(i)[[i]] %>% length()
                     },
                     stop(private$ERR_WTF, " Found type: ", type)
                 )
@@ -1615,6 +1626,7 @@ Kibior <- R6Class(
             }
             if(self$quiet_results) invisible(res) else res
         },
+
 
         #' @details
         #' Shortcut to `$count()` to match the classical `dim()` function pattern `[line col]`
@@ -1648,26 +1660,27 @@ Kibior <- R6Class(
             if(self$quiet_results) invisible(res) else res
         },
 
+
         #' @details
-        #' Get fields (columns) of indices.
+        #' Get fields/columns of indices.
         #'
         #' @family crud-metadata
         #'
         #' @examples
-        #' kc$fields("sw")          # direct search
-        #' kc$fields("sw_*")        # pattern search
+        #' kc$columns("sw")          # direct search
+        #' kc$columns("sw_*")        # pattern search
         #'
         #' @param index_name a vector of index names, can be a pattern (default: NULL).
         #'
-        #' @return a list of indices, each containing their fields.
+        #' @return a list of indices, each containing their fields/columns.
         #'
         # TODO test
-        fields = function(index_name = NULL){
+        columns = function(index_name = NULL){
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
             if(!private$is_search_pattern(index_name) && !self$has(index_name)) stop(private$err_index_unknown("index_name"))
             #
             res <- list()
-            tmp <- self$get_mappings(index_name = index_name)
+            tmp <- self$mappings(index_name = index_name)
             get_property_names <- function(node, index_name){
                 # try index name
                 r <- node[[index_name]]$properties %>% names()
@@ -1687,27 +1700,47 @@ Kibior <- R6Class(
         },
 
 
+        #' @details
+        #' Get fields/columns of indices.
+        #' Actually a synonym of `$columns()`.
+        #'
+        #' @family crud-metadata
+        #'
+        #' @examples
+        #' kc$fields("sw")          # direct search
+        #' kc$fields("sw_*")        # pattern search
+        #'
+        #' @param index_name a vector of index names, can be a pattern (default: NULL).
+        #'
+        #' @return a list of indices, each containing their fields/columns.
+        #'
+        # TODO test
+        fields = function(index_name = NULL){
+            self$columns(index_name = index_name)
+        },
+
+
         # --------------------------------------------------------------------------
         # methods - Data manipulation
         # --------------------------------------------------------------------------
 
 
         #' @details
-        #' Get distinct elements of a specific field.
+        #' Get distinct keys elements of a specific field/column.
         #'
         #' @family data-manipulation
         #'
         #' @examples
-        #' kc$distinct("sw", "name")
-        #' kc$distinct("sw", "eye_color")
+        #' kc$keys("sw", "name")
+        #' kc$keys("sw", "eye_color")
         #'
         #' @param index_name an index name (default: NULL).
         #' @param field_name a field name of this index (default: NULL).
         #'
-        #' @return a vector of distinct values from this field
+        #' @return a vector of keys values from this field/column
         #'
         # TODO test
-        distinct = function(index_name = NULL, field_name = NULL){
+        keys = function(index_name = NULL, field_name = NULL){
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
             if(length(index_name) > 1) stop(private$err_one_value("index_name"))
             if(private$is_search_pattern(index_name)) stop(private$err_search_pattern_forbidden("index_name"))
@@ -1734,9 +1767,31 @@ Kibior <- R6Class(
                                 index_name = index_name, 
                                 size = 0, 
                                 body = body)
-                r$aggregations$kaggs$buckets %>% 
+            r$aggregations$kaggs$buckets %>% 
                 lapply(function(x){ x$key }) %>% 
                 unlist()
+        },
+
+
+        #' @details
+        #' Get distinct keys elements of a specific field/column.
+        #' Actually a synonym of `$keys()`.
+        #'
+        #' @family data-manipulation
+        #'
+        #' @examples
+        #' kc$distinct("sw", "name")
+        #' kc$distinct("sw", "eye_color")
+        #'
+        #' @param index_name an index name (default: NULL).
+        #' @param field_name a field name of this index (default: NULL).
+        #'
+        #' @return a vector of distinct keys from this field/column
+        #'
+        # TODO test
+        distinct = function(index_name = NULL, field_name = NULL){
+            self$keys(index_name = index_name, 
+                    field_name = field_name)
         },
 
 
@@ -2592,7 +2647,6 @@ Kibior <- R6Class(
             # escape_elastic_reserved_characters <- function(s){
             #     stringr::str_replace_all(s, "(\\W)", "\\\\\\1")
             # }
-
             # get involved indices in search
             get_involved_indices <- function(req_indices){
                 # useless if all indices are named
@@ -2869,7 +2923,7 @@ Kibior <- R6Class(
                                 if(length(final_df[[ current_index ]]) == 0){
                                     final_df[[ current_index ]] <- raw
                                 } else {
-                                    final_df[[ current_index ]] <- rbind(raw, final_df[[ current_index ]])
+                                    final_df[[ current_index ]] <- dplyr::bind_rows(raw, final_df[[ current_index ]])
                                 }
                             }
 

@@ -41,7 +41,7 @@ test_that("kibior::define_mappings, nominal case", {
   private_define_mappings <- instantiate()$test_define_mappings
   #
   m <- private_define_mappings(starwars)$properties
-  p <- kc$get_mappings(single_index_name)[[single_index_name]][[single_index_name]]$properties
+  p <- kc$mappings(single_index_name)[[single_index_name]][[single_index_name]]$properties
   expect_setequal(c(names(m), "kid"), names(p))
   for(pro in names(m)){
     expect_equal(p[[pro]]$type, m[[pro]]$type)

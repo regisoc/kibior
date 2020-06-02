@@ -87,13 +87,13 @@ test_that("kibior::import, wrong args", {
   expect_error(kc$export("filenotfound", "ok"))
   expect_error(kc$export(c("sadf", "sdf"), "ok"))
   # duplicate
-  expect_error(kc$export(temp_filepath, duplicate_to = NULL))
+  expect_error(kc$export(temp_filepath, push_index = NULL))
   expect_error(kc$export(temp_filepath))
-  expect_error(kc$export(temp_filepath, duplicate_to = 123))
-  expect_error(kc$export(temp_filepath, duplicate_to = 123.234))
-  expect_error(kc$export(temp_filepath, duplicate_to = c()))
-  expect_error(kc$export(temp_filepath, duplicate_to = c("new1", "new2")))
-  expect_error(kc$export(temp_filepath, duplicate_to = list(123, "sdf")))
+  expect_error(kc$export(temp_filepath, push_index = 123))
+  expect_error(kc$export(temp_filepath, push_index = 123.234))
+  expect_error(kc$export(temp_filepath, push_index = c()))
+  expect_error(kc$export(temp_filepath, push_index = c("new1", "new2")))
+  expect_error(kc$export(temp_filepath, push_index = list(123, "sdf")))
 })
 
 test_that("kibior::import, nominal case", {
@@ -105,7 +105,7 @@ test_that("kibior::import, nominal case", {
   expect_equal(nrow(res), nrow(starwars))
   expect_equal(ncol(res), ncol(starwars))
   # push 
-  res <- kc$import(filepath = temp_filepath, duplicate_to = "starwars")
+  res <- kc$import(filepath = temp_filepath, push_index = "starwars")
   expect_equal(nrow(res), nrow(starwars))
   expect_equal(ncol(res), ncol(starwars))
   expect_equal(kc$list(), "starwars")
