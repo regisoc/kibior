@@ -2347,15 +2347,7 @@ Kibior <- R6Class(
             # transform col: field names cannot contain dots, transform and warn user
             has_dot <- grepl(".", names(data), fixed = TRUE)
             if(any(has_dot)){
-                # # replace names
-                # old_names <- names(data)[has_dot == TRUE] %>% paste0(collapse = ", ")
-                # names(data) <- gsub("\\.", "_", names(data))
-                # new_names <- names(data)[has_dot == TRUE] %>% paste0(collapse = ', ')
-                # # warn
-                # if(self$verbose){
-                #     message("Column names [", old_names, "] will be saved as [", new_names, "]")
-                # }
-
+                if(self$verbose) message("Dotted column names found, changing them...")
                 # replace names
                 old_names <- names(data)[has_dot == TRUE]
                 new_names <- old_names %>% gsub("\\.", "_", .)
@@ -2367,7 +2359,7 @@ Kibior <- R6Class(
                     zip <- as.list(zip)
                     for(i in names(zip)){
                         if(i != zip[[i]] && zip[[i]] %in% names(zip)){
-                            stop("New name [", zip[[i]], "] already exists in column names")
+                            stop("Column name [", i, "] should be changed to [", zip[[i]], "], but it already exists")
                         }
                     }
                 }
