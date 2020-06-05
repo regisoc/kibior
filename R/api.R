@@ -245,12 +245,12 @@ Kibior <- R6Class(
             if(!purrr::is_null(left_fields)){
                 # get "by" left index column names
                 by_left_fields <- by %>% as.list() %>% names()
-                left_fields <- c(left_fields, by_left_fields)
+                left_fields <- c(left_fields, by_left_fields) %>% unique()
             }
             if(!purrr::is_null(right_fields)){
                 # get "by" right index column names
                 by_right_fields <- by %>% as.list() %>% unlist(use.names = FALSE)
-                right_fields <- c(right_fields, by_right_fields)
+                right_fields <- c(right_fields, by_right_fields) %>% unique()
             }
             # side args check (left and right)
             check_side_args <- function(side){
@@ -556,35 +556,41 @@ Kibior <- R6Class(
             #
             if(self$verbose) message("Applying mapping to '", index_name, "'")
             mapping <- private$define_mappings(data)
-            res <- NULL
-            if(self$version$major >= 7){
-                res <- elastic::mapping_create(
-                    conn = self$connection,
-                    index = index_name,
-                    body = mapping
-                )
-            } else {
-                res <- tryCatch(
-                    expr = {
-                        # do not insert mapping type
-                        elastic::mapping_create(
-                            conn = self$connection,
-                            index = index_name,
-                            body = mapping
+            res <- tryCatch(
+                expr = {
+                    # do not insert mapping type
+                    elastic::mapping_create(
+                        conn = self$connection,
+                        index = index_name,
+                        body = mapping
+                    )
+                },
+                error = function(e){
+                    if(grepl("mapping type is missing", e$message, ignore.case = TRUE)){
+                        # older ES version < 7, try another time with mapping types
+                        if(self$verbose){
+                            message("Elasticsearch version < 7, trying type insertion...")    
+                        }
+                        # with type
+                        tryCatch(
+                            expr = {
+                                elastic::mapping_create(
+                                    conn = self$connection,
+                                    index = index_name,
+                                    type = "_doc",
+                                    include_type_name = TRUE,
+                                    body = mapping
+                                )
+                            }, 
+                            error = function(ee){
+                                stop(ee$message)
+                            }
                         )
-                    },
-                    error = function(e){
-                        # old ES version, try another time with mapping types
-                        elastic::mapping_create(
-                            conn = self$connection,
-                            index = index_name,
-                            type = index_name,
-                            include_type_name = TRUE,
-                            body = mapping
-                        )
+                    } else {
+                        stop(e$message)
                     }
-                )
-            }
+                }
+            )
             Sys.sleep(self$elastic_wait)
             res
         },
@@ -611,9 +617,7 @@ Kibior <- R6Class(
                                         only_expunge_deletes = FALSE, 
                                         flush = flush, 
                                         wait_for_merge = wait_for_merge)
-            } else {
-                if(self$verbose) message("Elasticsearch version >= 5, skipping optimize.")
-            }
+            } 
         },
 
 
@@ -1328,6 +1332,7 @@ Kibior <- R6Class(
             if(is.na(force)) stop(private$err_logical_na("force"))
             #
             res <- list()
+            complete <- list()
             f <- if(force) elastic::index_recreate else elastic::index_create
             for(i in index_name){
                 if(self$verbose) message("Creating index '", i, "'")
@@ -1340,14 +1345,32 @@ Kibior <- R6Class(
                         )
                     )
                 )
-                res[[i]] <- f(self$connection, index = i, body = body, verbose = FALSE)
+                # execute
+                complete[[i]] <- tryCatch(
+                    expr = {
+                        f(self$connection, index = i, body = body, verbose = FALSE)
+                    },
+                    error = function(e){
+                        if(grepl("already exists", e$message, ignore.case = TRUE)){
+                            list(acknowledged = FALSE)
+                        } else {
+                            stop(e$message)
+                        }
+                    }
+                )
                 # control
-                if(res[[i]]$acknowledged){
+                if(complete[[i]]$acknowledged){
                     private$force_merge()
                     private$optimize(i)
+                    res[[i]] <- TRUE
+                } else {
+                    res[[i]] <- FALSE
                 }
             }
-            Sys.sleep(self$elastic_wait)
+            # wait if at least one created
+            if(any(unlist(res, use.names = FALSE))){
+                Sys.sleep(self$elastic_wait)
+            }
             if(self$quiet_results) invisible(res) else res
         },
 
@@ -1423,15 +1446,38 @@ Kibior <- R6Class(
             if("*" %in% index_name) stop("Cannot delete all indices at once.")
             #
             res <- list()
+            complete <- list()
             for(i in index_name){
                 if(self$verbose) message("Deleting index '", i, "'")
-                res[[i]] <- elastic::index_delete(self$connection, index = i, verbose = FALSE)
-                if(res[[i]]$acknowledged){
+                # delete
+                complete[[i]] <- tryCatch(
+                    expr = {
+                        elastic::index_delete(self$connection, index = i, verbose = FALSE)
+                    },
+                    error = function(e){
+                        if(grepl("no such index", e$message, ignore.case = TRUE)){
+                            if(self$verbose){
+                                message("Index '", i, "' does not exists")
+                            }
+                            list(acknowledged = FALSE)
+                        } else {
+                            stop(e$message)
+                        }
+                    }
+                )
+                # 
+                if(complete[[i]]$acknowledged){
                     private$force_merge()
                     private$optimize(i)
+                    res[[i]] <- TRUE
+                } else {
+                    res[[i]] <- FALSE
                 }
             }
-            Sys.sleep(self$elastic_wait)
+            # wait if at least one deleted
+            if(any(unlist(res, use.names = FALSE))){
+                Sys.sleep(self$elastic_wait)
+            }
             if(self$quiet_results) invisible(res) else res
         },
 
@@ -2296,34 +2342,69 @@ Kibior <- R6Class(
                 # force add a column with unique id (single sequence 1:nrow)
                 ids <- seq_len(nrow(data))
                 data <- within(data, assign(self$default_id_col, ids))
-                if(self$verbose) message("Unique '", self$default_id_col, "' column added to enforce uniqueness of each record.")
+                if(self$verbose) message("Unique '", self$default_id_col, "' column added to enforce uniqueness of each record")
             }
             # transform col: field names cannot contain dots, transform and warn user
             has_dot <- grepl(".", names(data), fixed = TRUE)
-            if(TRUE %in% has_dot){
+            if(any(has_dot)){
+                # # replace names
+                # old_names <- names(data)[has_dot == TRUE] %>% paste0(collapse = ", ")
+                # names(data) <- gsub("\\.", "_", names(data))
+                # new_names <- names(data)[has_dot == TRUE] %>% paste0(collapse = ', ')
+                # # warn
+                # if(self$verbose){
+                #     message("Column names [", old_names, "] will be saved as [", new_names, "]")
+                # }
+
                 # replace names
-                old_names <- names(data)[has_dot == TRUE] %>% paste0(collapse = ", ")
-                names(data) <- gsub("\\.", "_", names(data))
-                new_names <- names(data)[has_dot == TRUE] %>% paste0(collapse = ', ')
+                old_names <- names(data)[has_dot == TRUE]
+                new_names <- old_names %>% gsub("\\.", "_", .)
+                changed_names <- gsub("\\.", "_", names(data))
+                # check
+                if(length(changed_names) != length(unique(changed_names))){
+                    zip <- changed_names
+                    names(zip) <- names(data)
+                    zip <- as.list(zip)
+                    for(i in names(zip)){
+                        if(i != zip[[i]] && zip[[i]] %in% names(zip)){
+                            stop("New name [", zip[[i]], "] already exists in column names")
+                        }
+                    }
+                }
+                # apply
+                names(data) <- changed_names
                 # warn
                 if(self$verbose){
-                    message("Fields [", old_names, "] contain forbidden dots.")
-                    message("They have been replaced by underscores. New names: [", new_names, "]")
+                    on <- old_names %>% paste0(collapse = ", ")
+                    nn <- new_names %>% paste0(collapse = ", ")
+                    message("Column names [", on, "] will be saved as [", nn, "]")
                 }
             }
             # -----------------------------------------
             # process: create index and mapping
             if(mode != "update"){
                 res <- self$create(index_name = index_name, force = (mode == "recreate"))
-                if(!res[[index_name]]$acknowledged) stop("Index not created.")
+                if(!res[[index_name]]) stop("Index '", index_name,"' not created")
                 # define mapping based on data type
-                mapping_res <- suppressWarnings({ 
-                    private$create_mappings(index_name = index_name, data = data)
-                })
-                if(purrr::is_null(mapping_res) || !mapping_res$acknowledged) stop("Cannot apply mapping to '", index_name, "'.")
+                err_msg <- paste0("Cannot apply mapping to '", index_name, "'")
+                mapping_res <- tryCatch(
+                    expr = {
+                        suppressWarnings({ 
+                            private$create_mappings(index_name = index_name, data = data)
+                        })
+                    }, 
+                    error = function(e){
+                        if(self$verbose){
+                            err_msg <- paste0(err_msg, "\n  ", e$message)
+                        }
+                        stop(err_msg)
+                    }
+                )
+                # TODO
+                if(purrr::is_null(mapping_res) || !mapping_res$acknowledged) stop(err_msg)
             }
             # prepare
-            if(self$verbose) message("Sending data to '", index_name, "'.")
+            if(self$verbose) message("Sending data to '", index_name, "'")
             args <- list(conn = self$connection,
                         x = data,
                         index = index_name,
@@ -3201,7 +3282,6 @@ Kibior$is_instance <- function(other){
     x <- c(Kibior$classname, "R6")
     y <- class(other)
     sd <- dplyr::setdiff(dplyr::union(x, y), dplyr::intersect(x, y))
-    # sd <- private$symmetric_difference(class(self), class(other))
     (purrr::is_character(sd) && length(sd) == 0)
 }
 
