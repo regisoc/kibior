@@ -525,11 +525,12 @@ Kibior <- R6Class(
                     "factor"    = { text_type },
                     "character" = { text_type },
                     "AsIs"      = { text_type },
+                    "logical"   = { text_type },
                     "numeric"   = { numeric_type },
                     "integer"   = { numeric_type },
                     "double"    = { numeric_type },
-                    "list"      = { map_types(x[[1]]) },
-                    stop(private$ERR_WTF, " Unknown type when creating Elasticsearch mapping, found: ", x, " [", xclass, "]")
+                    "list"      = { map_types(unlist(x, use.names = FALSE)[[1]]) },
+                    stop("Unknown type '", xclass, "' when creating Elasticsearch mapping")
                 )
             }
             # return mapping body
