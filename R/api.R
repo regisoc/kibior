@@ -1269,7 +1269,6 @@ Kibior <- R6Class(
             cat("  - port:", private$.port, "\n")
             if(!purrr::is_null(private$.user)){
                 cat("  - username:", private$.user, "\n")
-                cat("  - password:", private$.pwd, "\n")
             }
             cat("  - verbose:", f(self$verbose), "\n")
             cat("  - print result:", f(!self$quiet_results), "\n")
@@ -2359,13 +2358,8 @@ Kibior <- R6Class(
                 {. == "data.frame"} %>% 
                 any()
             if(has_df_type){
-                if(self$verbose){
-                    message("Flattening columns that are sub-dataframes")
-                }
+                if(self$verbose) message("Flattening columns that are sub-dataframes")
                 data <- data %>% jsonlite::flatten(recursive = FALSE)
-                # message("Data")
-                # message(str(data))
-                # message(lapply(data, class))
             }
             # transform col: field names cannot contain dots, transform and warn user
             has_dot <- grepl(".", names(data), fixed = TRUE)
