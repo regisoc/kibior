@@ -205,7 +205,7 @@ Kibior <- R6Class(
         # methods - abstract & utils
         # --------------------------------------------------------------------------
 
-        join = function(join_type = NULL, left_index, right_index, left_fields = NULL, left_query = NULL, left_bulk_size = 500, left_max_size = NULL, right_fields = NULL, right_query = NULL, right_bulk_size = 500, right_max_size = NULL, by = NULL, keep_metadata = FALSE) {
+        join = function(join_type = NULL, left_index, right_index, left_columns = NULL, left_query = NULL, left_bulk_size = 500, left_max_size = NULL, right_columns = NULL, right_query = NULL, right_bulk_size = 500, right_max_size = NULL, by = NULL, keep_metadata = FALSE) {
             "[Abstract method] Execute a join between two datasets using `dplyr` joins."
             "The datasets can be in-memory (variable name) or the name of an currently stored Elasticsearch index."
             "This should not be call directly. "
@@ -214,11 +214,11 @@ Kibior <- R6Class(
             "@param join_type the join type, defined by `private$.VALID_JOINS`. (default: NULL)"
             "@param left_index the left index name or dataset."
             "@param right_index the right index name or dataset."
-            "@param left_fields the left index fields to select. (default: NULL)"
+            "@param left_columns the left index columns to select. (default: NULL)"
             "@param left_query the left index query. (default: NULL)"
             "@param left_bulk_size the left index bulk size when downloading from Elasticsearch. (default: 500)"
             "@param left_max_size the left index max size (hard threshold). (default: NULL)"
-            "@param right_fields the right index fields to select. (default: NULL)"
+            "@param right_columns the right index columns to select. (default: NULL)"
             "@param right_query the right index query. (default: NULL)"
             "@param right_bulk_size the right index bulk size when downloading from Elasticsearch. (default: 500)"
             "@param right_max_size the right index max size (hard threshold). (default: NULL)"
@@ -241,16 +241,16 @@ Kibior <- R6Class(
             # metadata
             if(!purrr::is_logical(keep_metadata)) stop(private$err_param_type_logical("keep_metadata"))
             if(is.na(keep_metadata)) stop(private$err_logical_na("keep_metadata"))
-            # add columns from "by" to the left and right fields if not present
-            if(!purrr::is_null(left_fields)){
+            # add columns from "by" to the left and right columns if not present
+            if(!purrr::is_null(left_columns)){
                 # get "by" left index column names
-                by_left_fields <- by %>% as.list() %>% names()
-                left_fields <- c(left_fields, by_left_fields) %>% unique()
+                by_left_columns <- by %>% as.list() %>% names()
+                left_columns <- c(left_columns, by_left_columns) %>% unique()
             }
-            if(!purrr::is_null(right_fields)){
+            if(!purrr::is_null(right_columns)){
                 # get "by" right index column names
-                by_right_fields <- by %>% as.list() %>% unlist(use.names = FALSE)
-                right_fields <- c(right_fields, by_right_fields) %>% unique()
+                by_right_columns <- by %>% as.list() %>% unlist(use.names = FALSE)
+                right_columns <- c(right_columns, by_right_columns) %>% unique()
             }
             # side args check (left and right)
             check_side_args <- function(side){
@@ -260,13 +260,13 @@ Kibior <- R6Class(
                 # names
                 n_index <- name_arg("index")
                 n_query <- name_arg("query")
-                n_fields <- name_arg("fields")
+                n_columns <- name_arg("columns")
                 n_bulk_size <- name_arg("bulk_size")
                 n_max_size <- name_arg("max_size")
                 # values
                 v_index <- call_arg("index")
                 v_query <- call_arg("query")
-                v_fields <- call_arg("fields")
+                v_columns <- call_arg("columns")
                 v_bulk_size <- call_arg("bulk_size")
                 v_max_size <- call_arg("max_size")
                 # index
@@ -277,8 +277,8 @@ Kibior <- R6Class(
                         if(!purrr::is_character(v_query)) stop(private$err_param_type_character(n_query, can_be_null = TRUE))
                         if(length(v_query) > 1) stop(private$err_one_value(n_query))
                     } 
-                    if(!purrr::is_null(v_fields) && !purrr::is_character(v_fields)) {
-                        stop(private$err_param_type_character(n_fields, can_be_null = TRUE))
+                    if(!purrr::is_null(v_columns) && !purrr::is_character(v_columns)) {
+                        stop(private$err_param_type_character(n_columns, can_be_null = TRUE))
                     }
                 } else {
                     # data from in-memory 
@@ -303,7 +303,7 @@ Kibior <- R6Class(
             check_side_args("right")
 
             #
-            get_data <- function(index, fields, query, bulk_size, max_size){
+            get_data <- function(index, columns, query, bulk_size, max_size){
                 "Function: get data from ES index or memory"
                 index_data <- NULL
                 if(purrr::is_character(index)){
@@ -311,7 +311,7 @@ Kibior <- R6Class(
                     if(self$verbose) message("from index '", index, "'")
                     index_data <- self$pull(
                             index_name = index,
-                            fields = fields,
+                            columns = columns,
                             query = query,
                             bulk_size = bulk_size,
                             max_size = max_size,
@@ -333,7 +333,7 @@ Kibior <- R6Class(
                     # if data.frame derivative, just load it as tibble
                     if(self$verbose) message("from memory")
                     index_data <- index %>%
-                        dplyr::select( if(purrr::is_null(fields)) dplyr::everything() else fields ) %>%
+                        dplyr::select( if(purrr::is_null(columns)) dplyr::everything() else columns ) %>%
                         (function(x){ if(!purrr::is_null(max_size)) head(x, max_size) else x }) %>%
                         dplyr::as_tibble(.name_repair = "unique")
                 }
@@ -344,7 +344,7 @@ Kibior <- R6Class(
             if(self$verbose) message("Getting left ", appendLF = FALSE)
             left <- get_data(
                     index = left_index, 
-                    fields = left_fields, 
+                    columns = left_columns, 
                     query = left_query, 
                     bulk_size = left_bulk_size, 
                     max_size = left_max_size
@@ -353,7 +353,7 @@ Kibior <- R6Class(
             if(self$verbose) message("Getting right ", appendLF = FALSE)
             right <- get_data(
                     index = right_index, 
-                    fields = right_fields, 
+                    columns = right_columns, 
                     query = right_query, 
                     bulk_size = right_bulk_size, 
                     max_size = right_max_size
@@ -522,14 +522,20 @@ Kibior <- R6Class(
                     xclass <- "factor"
                 }
                 switch(xclass,
+                    # text types
                     "factor"    = { text_type },
                     "character" = { text_type },
                     "AsIs"      = { text_type },
                     "logical"   = { text_type },
+                    # numerical types
                     "numeric"   = { numeric_type },
                     "integer"   = { numeric_type },
                     "double"    = { numeric_type },
+                    # in case of list, get the type of the first non null value 
                     "list"      = { map_types(unlist(x, use.names = FALSE)[[1]]) },
+                    # data.frame
+                    "data.frame"= { stop("Data contains multiple levels of dataframes, which are not handled by Kibior") },
+                    # all others
                     stop("Unknown type '", xclass, "' when creating Elasticsearch mapping")
                 )
             }
@@ -557,6 +563,7 @@ Kibior <- R6Class(
             #
             if(self$verbose) message("Applying mapping to '", index_name, "'")
             mapping <- private$define_mappings(data)
+            # req
             res <- tryCatch(
                 expr = {
                     # do not insert mapping type
@@ -1793,18 +1800,18 @@ Kibior <- R6Class(
         #' kc$keys("sw", "eye_color")
         #'
         #' @param index_name an index name (default: NULL).
-        #' @param field_name a field name of this index (default: NULL).
+        #' @param columns a field name of this index (default: NULL).
         #'
         #' @return a vector of keys values from this field/column
         #'
         # TODO test
-        keys = function(index_name = NULL, field_name = NULL){
+        keys = function(index_name = NULL, columns = NULL){
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
             if(length(index_name) > 1) stop(private$err_one_value("index_name"))
             if(private$is_search_pattern(index_name)) stop(private$err_search_pattern_forbidden("index_name"))
-            if(!purrr::is_character(field_name)) stop(private$err_param_type_character("field_name"))
-            if(length(field_name) > 1) stop(private$err_one_value("field_name"))
-            if(!(field_name %in% self$fields(index_name)[[index_name]])) stop(private$err_field_unknown(index_name, field_name))
+            if(!purrr::is_character(columns)) stop(private$err_param_type_character("columns"))
+            if(length(columns) > 1) stop(private$err_one_value("columns"))
+            if(!(columns %in% self$columns(index_name)[[index_name]])) stop(private$err_field_unknown(index_name, columns))
 
             # TODO
             # need to be changed to composite aggr.
@@ -1816,7 +1823,7 @@ Kibior <- R6Class(
                 "aggs" = list(
                     "kaggs" = list(
                         "terms" = list(
-                            "field" = paste0(field_name, ".keyword")
+                            "field" = paste0(columns, ".keyword")
                         )
                     )
                 )
@@ -1842,14 +1849,14 @@ Kibior <- R6Class(
         #' kc$distinct("sw", "eye_color")
         #'
         #' @param index_name an index name (default: NULL).
-        #' @param field_name a field name of this index (default: NULL).
+        #' @param columns a field name of this index (default: NULL).
         #'
         #' @return a vector of distinct keys from this field/column
         #'
         # TODO test
-        distinct = function(index_name = NULL, field_name = NULL){
+        distinct = function(index_name = NULL, columns = NULL){
             self$keys(index_name = index_name, 
-                    field_name = field_name)
+                    columns = columns)
         },
 
 
@@ -2250,7 +2257,7 @@ Kibior <- R6Class(
                 "features"  = { self$import_features },
                 "alignments"= { self$import_alignments },
                 "sequences" = { self$import_sequences },
-                stop(private$ERR_WTF)
+                stop(private$ERR_WTF, " Unknown import type '", import_type, "'")
             )
             data <- m(filepath = filepath, to_tibble = to_tibble)
             # check/push
@@ -2297,7 +2304,7 @@ Kibior <- R6Class(
         #' # update that apply, based on cahracter names to match the right record
         #' kc$push(some_new_data, "sw", mode = "update", id_col = "name")
         #' # view result by querying
-        #' kc$pull("sw", query = "height:>180", fields = c("name", "gender"))
+        #' kc$pull("sw", query = "height:>180", columns = c("name", "gender"))
         #'
         #' @param data the data to push (default: NULL).
         #' @param index_name the index name to use in Elasticsearch (default: NULL).
@@ -2313,7 +2320,7 @@ Kibior <- R6Class(
             if(nrow(data) == 0) stop(private$err_null_forbidden("data"))
             # data names to lowercase
             names(data) <- tolower(names(data))
-            if(self$verbose) message("All field names are now to lowercase")
+            if(self$verbose) message("All columns names are now to lowercase")
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
             if(length(index_name) > 1) stop(private$err_one_value("index_name"))
             if(!is.numeric(bulk_size)) stop(private$err_param_type_numeric("bulk_size"))
@@ -2344,6 +2351,21 @@ Kibior <- R6Class(
                 ids <- seq_len(nrow(data))
                 data <- within(data, assign(self$default_id_col, ids))
                 if(self$verbose) message("Unique '", self$default_id_col, "' column added to enforce uniqueness of each record")
+            }
+            # try to flatten if data.frame class is found in one of the column types
+            has_df_type <- data %>% 
+                lapply(class) %>% 
+                unlist(use.names = FALSE) %>% 
+                {. == "data.frame"} %>% 
+                any()
+            if(has_df_type){
+                if(self$verbose){
+                    message("Flattening columns that are sub-dataframes")
+                }
+                data <- data %>% jsonlite::flatten(recursive = FALSE)
+                # message("Data")
+                # message(str(data))
+                # message(lapply(data, class))
             }
             # transform col: field names cannot contain dots, transform and warn user
             has_dot <- grepl(".", names(data), fixed = TRUE)
@@ -2458,17 +2480,17 @@ Kibior <- R6Class(
         #' kc$pull("sw")
         #' # get the whole "sw" index with all metadata
         #' kc$pull("sw", keep_metadata = TRUE)
-        #' # get only "name" and "status" fields of indices starting with "s"
-        #' # fields not found will be ignored
-        #' kc$pull("s*", fields = c("name", "status"))
+        #' # get only "name" and "status" columns of indices starting with "s"
+        #' # columns not found will be ignored
+        #' kc$pull("s*", columns = c("name", "status"))
         #' # limit the size of the result to 10
         #' kc$pull("storms", max_size = 10, bulk_size = 10)
         #' # use Elasticsearch query syntax to select and filter on all indices, for all data
         #' # Here, we want to search for all records taht match the conditions:
         #' # field "height" is strictly more than 180 AND field homeworld is "Tatooine" OR "Naboo"
         #' r <- kc$pull("sw", query = "height:>180 && homeworld:(Tatooine || Naboo)")
-        #' # it can be used in conjunction with `fields` to select only columns that matter
-        #' r <- kc$pull("sw", query = "height:>180 && homeworld:(Tatooine || Naboo)", fields = 
+        #' # it can be used in conjunction with `columns` to select only columns that matter
+        #' r <- kc$pull("sw", query = "height:>180 && homeworld:(Tatooine || Naboo)", columns = 
         #'  c("name", "hair_color", "homeworld"))
         #'
         #' @param index_name the index name to use in Elasticsearch (default: NULL).
@@ -2476,9 +2498,9 @@ Kibior <- R6Class(
         #' @param max_size the number of record Elasticsearch will send (default: NULL (all data)).
         #' @param scroll_timer the time the scroll API will let the request alive to scroll on the 
         #'  result (default: "3m" (3 minute)).
-        #' @param keep_metadata does Elasticsearch needs to sent metadata? Data fields will be 
+        #' @param keep_metadata does Elasticsearch needs to sent metadata? Data columns will be 
         #'  prefixed by "_source." (default: FALSE).
-        #' @param fields a vector of fields to select (default: NULL (all fields)).
+        #' @param columns a vector of columns to select (default: NULL (all columns)).
         #' @param query a string formatted to Elasticsearch query syntax, see links for the syntax 
         #'  details (default: NULL)
         #'
@@ -2491,11 +2513,11 @@ Kibior <- R6Class(
         #' @return a list of datasets corresponding to the pull request, else an error. Keys of the 
         #'  list are index names matching the request, value are the associated tibbles
         #'
-        pull = function(index_name = NULL, bulk_size = 500, max_size = NULL, scroll_timer = "3m", keep_metadata = FALSE, fields = NULL, query = NULL) {
+        pull = function(index_name = NULL, bulk_size = 500, max_size = NULL, scroll_timer = "3m", keep_metadata = FALSE, columns = NULL, query = NULL) {
             args <- list(
                 index_name = index_name, 
                 keep_metadata = keep_metadata, 
-                fields = fields, 
+                columns = columns, 
                 query = query, 
                 bulk_size = bulk_size, 
                 max_size = max_size, 
@@ -2553,7 +2575,7 @@ Kibior <- R6Class(
             source_str <- paste0("'" , source_instance$host, ":", source_instance$port, "/", from_index, "'")
             dest_str <- paste0("'", self$host, ":", self$port, "/", to_index, "'")
             message(action, " " , source_str, " to ", dest_str)
-            # TODO: add "_source" = fields to select only some fields
+            # TODO: add "_source" = columns to select only some columns
             # TODO: add "query" = query to execute a query before moving, need to parse query string to struct
             # building args - source subpart
             source_param <- list(index = from_index)
@@ -2660,15 +2682,15 @@ Kibior <- R6Class(
         #' kc$search("sw", keep_metadata = TRUE)
         #' # get only "name" field of the head of indices starting with "s"
         #' # if an index does not have the "name" field, it will be empty
-        #' kc$search("s*", fields = "name")
+        #' kc$search("s*", columns = "name")
         #' # limit the size of the result to 50 to the whole index
         #' kc$search("storms", max_size = 50, bulk_size = 50, head = FALSE)
         #' # use Elasticsearch query syntax to select and filter on all indices, for all data
         #' # Here, we want to search for all records taht match the conditions:
         #' # field "height" is strictly more than 180 AND field homeworld is "Tatooine" OR "Naboo"
         #' kc$search("*", query = "height:>180 && homeworld:(Tatooine || Naboo)")
-        #' # it can be used in conjunction with `fields` to select only columns that matter
-        #' kc$search("*", query = "height:>180 && homeworld:(Tatooine || Naboo)", fields = 
+        #' # it can be used in conjunction with `columns` to select only columns that matter
+        #' kc$search("*", query = "height:>180 && homeworld:(Tatooine || Naboo)", columns = 
         #'  c("name", "hair_color", "homeworld"))
         #'
         #' @param index_name the index name to use in Elasticsearch (default: NULL).
@@ -2676,9 +2698,9 @@ Kibior <- R6Class(
         #' @param max_size the number of record Elasticsearch will send (default: NULL (all data)).
         #' @param scroll_timer the time the scroll API will let the request alive to scroll on the 
         #'  result (default: "3m" (3 minutes)).
-        #' @param keep_metadata does Elasticsearch needs to sent metadata? Data fields will be 
+        #' @param keep_metadata does Elasticsearch needs to sent metadata? Data columns will be 
         #'  prefixed by "_source." (default: FALSE).
-        #' @param fields a vector of fields to select (default: NULL (all fields)).
+        #' @param columns a vector of columns to select (default: NULL (all columns)).
         #' @param head a boolean limiting the search result and time (default: TRUE)
         #' @param query a string formatted to Elasticsearch query syntax, see links for the syntax 
         #'  details (default: NULL)
@@ -2690,7 +2712,7 @@ Kibior <- R6Class(
         #' @return a list of datasets corresponding to the pull request, else an error. Keys of the 
         #'  list are index names matching the request, value are the associated tibbles
         #'
-        search = function(index_name = "_all", keep_metadata = FALSE, fields = NULL,  bulk_size = 500, max_size = NULL, scroll_timer = "3m", head = TRUE, query = NULL){
+        search = function(index_name = "_all", keep_metadata = FALSE, columns = NULL,  bulk_size = 500, max_size = NULL, scroll_timer = "3m", head = TRUE, query = NULL){
             if(purrr::is_null(index_name)) index_name <- "_all"
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
             if(!is.numeric(bulk_size)) stop(private$err_param_type_numeric("bulk_size"))
@@ -2708,7 +2730,7 @@ Kibior <- R6Class(
             if(length(scroll_timer) > 1) stop(private$err_one_value("scroll_timer"))
             if(!purrr::is_logical(keep_metadata)) stop(private$err_param_type_logical("keep_metadata"))
             if(is.na(keep_metadata)) stop(private$err_logical_na("keep_metadata"))
-            if(!purrr::is_null(fields) && !purrr::is_character(fields)) stop(private$err_param_type_character("fields"))
+            if(!purrr::is_null(columns) && !purrr::is_character(columns)) stop(private$err_param_type_character("columns"))
             if(!purrr::is_null(query)){
                 if(!purrr::is_character(query)) stop(private$err_param_type_character("query"))
                 if(length(query) > 1) stop(private$err_one_value("query"))
@@ -2725,7 +2747,7 @@ Kibior <- R6Class(
             # return result
             final_df <- list()
             # init
-            selected_fields <- if(purrr::is_null(fields)) NULL else paste0(fields, collapse = ",")
+            selected_fields <- if(purrr::is_null(columns)) NULL else paste0(columns, collapse = ",")
             end_search <- FALSE
             # # escape string for ES
             # # https://stackoverflow.com/a/14838753
