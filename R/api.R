@@ -373,7 +373,6 @@ Kibior <- R6Class(
                 do.call(args = fargs)
         },
 
-
         round = function(nb, nb_decimal = 1){
             "Round to a number to a given decimal number"
             ""
@@ -388,24 +387,24 @@ Kibior <- R6Class(
                 trimws()
         },
 
-
-        humanize_mstime = function(time){
-            "Format a millisecond time to a easily readable string"
+        humanize_time = function(time){
+            "Format a second-based time to a easily readable string"
             ""
-            "@param time the millisecond time"
+            "@param time the time in seconds"
             "@return a list composed of `$time` and `$unit`"
 
-            # take a time number (in ms) and returns a more readable version with unit
+            # take a time number (in seconds) and returns a more readable version with unit
             if(!is.numeric(time)) stop(private$err_param_type_numeric("time"))
             if(time < 0) stop(private$err_param_positive("time"))
-            #
-            # time in milliseconds
-            res <- list(unit = "ms", time = time)
-            # if under 1 sec, keep it in ms
-            if(res$time > 1000){
-                # update to sec
-                res$time <- res$time / 1000
-                res$unit <- "s"
+            # time in seconds
+            res <- list(unit = "s", time = time)
+            # milliseconds
+            if(res$time < 1){
+                # update to ms
+                res$time <- res$time * 1000
+                res$unit <- "ms"
+            } else {
+                # minutes
                 if(res$time > 60){
                     # update to min
                     res$time <- res$time / 60
@@ -422,10 +421,10 @@ Kibior <- R6Class(
                     }
                 }
             }
+            # round it 
             res$time <- private$round(res$time, nb_decimal = 3)
             res
         },
-
 
         is_list_empty = function(my_list){
             "Shortcut to test if a variable is a list and is empty"
@@ -442,7 +441,6 @@ Kibior <- R6Class(
             if(!purrr::is_list(my_list)) stop(private$err_param_type_list("my_list"))
             (length(my_list) == 0)
         },
-
 
         vector_to_str = function(vect){
             "Transform a vector to a listed string"
@@ -516,12 +514,13 @@ Kibior <- R6Class(
             )
             numeric_type <- list(type = "float")
             # map
-            map_types <- function(x){
+            map_types <- function(x,y){
                 xclass <- class(x)
                 if(length(xclass) > 1 && "factor" %in% xclass){
                     xclass <- "factor"
                 }
                 switch(xclass,
+                    "NULL"      = { stop("The column '", y, "' contains only NULL values. Remove it before pushing.") },
                     # text types
                     "factor"    = { text_type },
                     "character" = { text_type },
@@ -532,7 +531,7 @@ Kibior <- R6Class(
                     "integer"   = { numeric_type },
                     "double"    = { numeric_type },
                     # in case of list, get the type of the first non null value 
-                    "list"      = { map_types(unlist(x, use.names = FALSE)[[1]]) },
+                    "list"      = { map_types(unlist(x, use.names = FALSE)[[1]], y) },
                     # data.frame
                     "data.frame"= { stop("Data contains multiple levels of dataframes, which are not handled by Kibior") },
                     # all others
@@ -540,7 +539,8 @@ Kibior <- R6Class(
                 )
             }
             # return mapping body
-            lapply(data, map_types) %>%
+            # lapply(data, map_types) %>%
+            purrr::imap(data, map_types) %>%
                 list(properties = .)
         },
 
@@ -561,9 +561,10 @@ Kibior <- R6Class(
             if(length(index_name) > 1) stop(private$err_one_value("index_name"))
             if(purrr::is_null(data) || length(data) == 0) stop(private$err_empty_data("data"))
             #
-            if(self$verbose) message("Applying mapping to '", index_name, "'")
+            if(self$verbose) message(" -> Applying mapping to '", index_name, "'")
             mapping <- private$define_mappings(data)
             # req
+            if(self$verbose) message(" -> Trying without type insertion (ES > v7)... ", appendLF = FALSE)
             res <- tryCatch(
                 expr = {
                     # do not insert mapping type
@@ -572,31 +573,36 @@ Kibior <- R6Class(
                         index = index_name,
                         body = mapping
                     )
+                    if(self$verbose) message("ok")
                 },
                 error = function(e){
+                    res <- NULL
+                    if(self$verbose) message("nok")
                     if(grepl("mapping type is missing", e$message, ignore.case = TRUE)){
                         # older ES version < 7, try another time with mapping types
-                        if(self$verbose){
-                            message("Elasticsearch version < 7, trying type insertion...")    
-                        }
+                        if(self$verbose) message(" -> Trying with type insertion (ES < v7)... ", appendLF = FALSE)
                         # with type
-                        tryCatch(
+                        res <- tryCatch(
                             expr = {
-                                elastic::mapping_create(
+                                res <- elastic::mapping_create(
                                     conn = self$connection,
                                     index = index_name,
                                     type = "_doc",
                                     include_type_name = TRUE,
                                     body = mapping
                                 )
+                                if(self$verbose) message("ok")
+                                res
                             }, 
                             error = function(ee){
+                                if(self$verbose) message("nok")
                                 stop(ee$message)
                             }
                         )
                     } else {
                         stop(e$message)
                     }
+                    res
                 }
             )
             Sys.sleep(self$elastic_wait)
@@ -1256,7 +1262,6 @@ Kibior <- R6Class(
             private$connect()
         },
 
-
         #' @details
         #' Print simple informations of the current object.
         #'
@@ -1275,7 +1280,6 @@ Kibior <- R6Class(
             cat("  - print progressbar:", f(!self$quiet_progress), "\n")
         },
 
-
         # TODO test
         #'
         #' @details
@@ -1293,7 +1297,6 @@ Kibior <- R6Class(
             r <- (self$host == other$host && self$port == other$port)
             if(self$quiet_results) invisible(r) else r
         },
-
 
         # TODO test
         #'
@@ -1342,7 +1345,7 @@ Kibior <- R6Class(
             complete <- list()
             f <- if(force) elastic::index_recreate else elastic::index_create
             for(i in index_name){
-                if(self$verbose) message("Creating index '", i, "'")
+                if(self$verbose) message(" -> Creating index '", i, "'")
                 # build with settings but mapping is defined with data to better match fields type
                 body <- list(
                     "settings" = list(
@@ -1381,7 +1384,6 @@ Kibior <- R6Class(
             if(self$quiet_results) invisible(res) else res
         },
 
-
         #' @details
         #' List indices in Elasticsearch.
         #'
@@ -1403,7 +1405,6 @@ Kibior <- R6Class(
             }
             if(self$quiet_results) invisible(r) else r
         },
-
 
         #' @details
         #' Does Elasticsearch has one or several indices?
@@ -1432,7 +1433,6 @@ Kibior <- R6Class(
             }
             if(self$quiet_results) invisible(res) else res
         },
-
 
         #' @details
         #' Delete one or several indices in Elasticsearch.
@@ -1511,7 +1511,6 @@ Kibior <- R6Class(
             if(self$quiet_results) invisible(r) else r
         },
 
-
         #' @details
         #' Ping cluster connection
         #'
@@ -1526,7 +1525,6 @@ Kibior <- R6Class(
             r <- self$connection$ping()
             if(self$quiet_results) invisible(r) else r
         },
-
 
         # --------------------------------------------------------------------------
         # methods - CRUD metadata
@@ -1570,7 +1568,6 @@ Kibior <- R6Class(
             if(self$quiet_results) invisible(res) else res
         },
 
-
         #' @details
         #' Get mappings of indices
         #'
@@ -1599,7 +1596,6 @@ Kibior <- R6Class(
             if(self$quiet_results) invisible(res) else res
         },
 
-
         #' @details
         #' Get settings of indices
         #'
@@ -1620,7 +1616,6 @@ Kibior <- R6Class(
             if(self$quiet_results) invisible(res) else res
         },
 
-
         #' @details
         #' Get aliases of indices
         #'
@@ -1640,7 +1635,6 @@ Kibior <- R6Class(
                                             index_name = index_name)
             if(self$quiet_results) invisible(res) else res
         },
-
 
         #' @details
         #' Count observations or variables in Elasticsearch data
@@ -1690,7 +1684,6 @@ Kibior <- R6Class(
             }
             if(self$quiet_results) invisible(res) else res
         },
-
 
         #' @details
         #' Shortcut to `$count()` to match the classical `dim()` function pattern `[line col]`
@@ -2319,7 +2312,7 @@ Kibior <- R6Class(
             if(nrow(data) == 0) stop(private$err_null_forbidden("data"))
             # data names to lowercase
             names(data) <- tolower(names(data))
-            if(self$verbose) message("All columns names are now to lowercase")
+            if(self$verbose) message(" -> Forcing all columns names to lowercase")
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
             if(length(index_name) > 1) stop(private$err_one_value("index_name"))
             if(!is.numeric(bulk_size)) stop(private$err_param_type_numeric("bulk_size"))
@@ -2332,6 +2325,10 @@ Kibior <- R6Class(
                 if(purrr::is_null(id_col)) stop("Update mode needs a unique IDs column name.")
                 if(!self$has(index_name)) stop(private$err_index_unknown(index_name))
             }
+            # -----------------------------------------
+            # PREPARE DATA 
+
+            # ------------------
             # handle id_col
             ids <- NULL
             if(!purrr::is_null(id_col)){
@@ -2349,8 +2346,10 @@ Kibior <- R6Class(
                 # force add a column with unique id (single sequence 1:nrow)
                 ids <- seq_len(nrow(data))
                 data <- within(data, assign(self$default_id_col, ids))
-                if(self$verbose) message("Unique '", self$default_id_col, "' column added to enforce uniqueness of each record")
+                if(self$verbose) message(" -> Adding unique '", self$default_id_col, "' column to enforce uniqueness")
             }
+
+            # ------------------
             # try to flatten if data.frame class is found in one of the column types
             has_df_type <- data %>% 
                 lapply(class) %>% 
@@ -2358,13 +2357,14 @@ Kibior <- R6Class(
                 {. == "data.frame"} %>% 
                 any()
             if(has_df_type){
-                if(self$verbose) message("Flattening columns that are sub-dataframes")
-                data <- data %>% jsonlite::flatten(recursive = FALSE)
+                if(self$verbose) message(" -> Flattening columns that have sub-dataframes")
+                data <- jsonlite::flatten(data)
             }
+
+            # ------------------
             # transform col: field names cannot contain dots, transform and warn user
             has_dot <- grepl(".", names(data), fixed = TRUE)
             if(any(has_dot)){
-                if(self$verbose) message("Dotted column names found, changing them...")
                 # replace names
                 old_names <- names(data)[has_dot == TRUE]
                 new_names <- old_names %>% gsub("\\.", "_", .)
@@ -2383,13 +2383,61 @@ Kibior <- R6Class(
                 # apply
                 names(data) <- changed_names
                 # warn
-                if(self$verbose){
-                    on <- old_names %>% paste0(collapse = ", ")
-                    nn <- new_names %>% paste0(collapse = ", ")
-                    message("Column names [", on, "] will be saved as [", nn, "]")
+                if(self$verbose){ 
+                    message(" -> Changing column names: ")
+                    old_names %>% 
+                        paste0(collapse = ", ") %>% 
+                        message("      from: ", .)
+                    new_names %>% 
+                        paste0(collapse = ", ") %>% 
+                        message("        to: ", .)
                 }
             }
+
+            # ------------------
+            # remove empty columns
+            is_column_empty_char <- function(x){
+                # test if a list contains only empty strings ""  values
+                x %>%
+                    unlist(use.names = FALSE) %>%
+                    {. == ""} %>%
+                    all()
+            }
+            is_column_empty_null <- function(x){
+                # test if a list contains only NULL values
+                x %>%
+                    unlist(use.names = FALSE) %>%
+                    purrr::is_null()
+            }
+            is_column_empty_na <- function(x){
+                # test if a list contains only NA values
+                x %>%
+                    unlist(use.names = FALSE) %>%
+                    is.na() %>%
+                    all()
+            }
+            is_column_empty <- function(x){
+                # test if a list contains only NA, NULL or empty strings values
+                is_column_empty_char(x) || 
+                    is_column_empty_null(x) || 
+                    is_column_empty_na(x)
+            }
+            # get empty columns
+            cols_empty <- sapply(data, is_column_empty)
+            if(any(cols_empty)){
+                if(self$verbose){
+                    cols_empty %>% 
+                        which(.) %>% 
+                        names() %>% 
+                        paste0(collapse = ", ") %>%
+                        message(" -> Removing empty columns: ", .)
+                }
+                # remove empty columns from data
+                data <- data[-which(cols_empty)]
+            }
+            
             # -----------------------------------------
+            # DEFINE AND APPLY MAPPING
             # process: create index and mapping
             if(mode != "update"){
                 res <- self$create(index_name = index_name, force = (mode == "recreate"))
@@ -2409,11 +2457,18 @@ Kibior <- R6Class(
                         stop(err_msg)
                     }
                 )
-                # TODO
+                # control result
                 if(purrr::is_null(mapping_res) || !mapping_res$acknowledged) stop(err_msg)
             }
+
+
+            data %>% dplyr::as_tibble() %>% print()
+
+
+            # -----------------------------------------
+            # SEND DATA
             # prepare
-            if(self$verbose) message("Sending data to '", index_name, "'")
+            if(self$verbose) message(" -> Sending data to '", index_name, "'")
             args <- list(conn = self$connection,
                         x = data,
                         index = index_name,
@@ -2448,12 +2503,16 @@ Kibior <- R6Class(
                     unlist(use.names = FALSE) %>%
                     sum() %>%
                     as.double() %>%
-                    private$humanize_mstime()
+                    {. / 1000} %>%
+                    private$humanize_time()
                 # user info
-                user_took <- { elapsed[["elapsed"]] * 1000 } %>% 
-                    private$humanize_mstime()
-                message("\nData received in ", es_took$time, es_took$unit, 
-                    ", user waited ", user_took$time, user_took$unit)
+                user_took <- elapsed[["elapsed"]] %>% 
+                    private$humanize_time()
+                # execution
+                message(" -> Execution time: ")
+                message("   - data sent: ", es_took$time, es_took$unit)
+                message("   - user wait: ", user_took$time, user_took$unit)
+
             }
             # get some time so Elasticsearch can make them available
             Sys.sleep(self$elastic_wait)
@@ -2610,7 +2669,7 @@ Kibior <- R6Class(
             if(!copy) source_instance$delete(from_index)
             # msg
             if(self$verbose){
-                t <- private$humanize_mstime(res$took)
+                t <- private$humanize_time(res$took)
                 message("Documents transfered: ", res$total, ", took: ", t$time, t$unit)
             }
             Sys.sleep(self$elastic_wait)
@@ -2709,16 +2768,29 @@ Kibior <- R6Class(
         search = function(index_name = "_all", keep_metadata = FALSE, columns = NULL,  bulk_size = 500, max_size = NULL, scroll_timer = "3m", head = TRUE, query = NULL){
             if(purrr::is_null(index_name)) index_name <- "_all"
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
+            if(!purrr::is_logical(head)) stop(private$err_param_type_logical("head"))
+            if(is.na(head)) stop(private$err_logical_na("head"))
+            if(("_all" %in% index_name) && !head) message("Retriving ALL data... you should target some indices instead.")
+            # define when to stop the search with head mode
+            if(self$verbose) {
+                message(" -> Using head mode: ", if(head) "yes" else "no")
+                if(head) message(" -> Head size: ", self$head_search_size)
+            }
             if(!is.numeric(bulk_size)) stop(private$err_param_type_numeric("bulk_size"))
             if(length(bulk_size) > 1) stop(private$err_one_value("bulk_size"))
             if(bulk_size < 1) stop(private$err_param_positive("bulk_size", can_be_null = FALSE))
             bulk_size <- as.integer(bulk_size)
+            if(self$verbose) message(" -> Using 'bulk_size': ", bulk_size)
             if(!purrr::is_null(max_size)){
                 if(!is.numeric(max_size)) stop(private$err_param_type_numeric("max_size"))
                 if(length(max_size) > 1) stop(private$err_one_value("max_size"))
                 if(max_size < 1) stop(private$err_param_positive("max_size", can_be_null = FALSE))
-                if(bulk_size > max_size) stop("'bulk_size' > 'max_size' (", bulk_size, ">", max_size, ")")
                 max_size <- as.integer(max_size)
+                if(self$verbose) message(" -> Using 'max_size': ", max_size)
+                if(bulk_size > max_size){
+                    if(self$verbose) message(" -> Reducing 'bulk_size' to match 'max_size': ", max_size)
+                    bulk_size <- max_size
+                }
             }
             if(!purrr::is_character(scroll_timer)) stop(private$err_param_type_character("scroll_timer"))
             if(length(scroll_timer) > 1) stop(private$err_one_value("scroll_timer"))
@@ -2729,27 +2801,15 @@ Kibior <- R6Class(
                 if(!purrr::is_character(query)) stop(private$err_param_type_character("query"))
                 if(length(query) > 1) stop(private$err_one_value("query"))
             }
-            if(!purrr::is_logical(head)) stop(private$err_param_type_logical("head"))
-            if(is.na(head)) stop(private$err_logical_na("head"))
-            if(("_all" %in% index_name) && !head) message("Retriving ALL data... you should target some indices instead.")
-            # define when to stop the search with head mode
-            if(self$verbose) {
-                message("Head mode: ", if(head) "on" else "off" , "")
-                if(head) message("Head size: ", self$head_search_size)
-            }
-            # terminate_after <- if(head) self$head_search_size else NULL
             # return result
             final_df <- list()
             # init
             selected_fields <- if(purrr::is_null(columns)) NULL else paste0(columns, collapse = ",")
             end_search <- FALSE
-            # # escape string for ES
-            # # https://stackoverflow.com/a/14838753
-            # escape_elastic_reserved_characters <- function(s){
-            #     stringr::str_replace_all(s, "(\\W)", "\\\\\\1")
-            # }
             # get involved indices in search
             get_involved_indices <- function(req_indices){
+                # first requests can be long, warn user
+                if(self$verbose) message(" -> Waiting for Elasticsearch to parse requests...")
                 # useless if all indices are named
                 if(!private$is_search_pattern(req_indices)){
                     index_names_list <- req_indices
@@ -2827,14 +2887,12 @@ Kibior <- R6Class(
             # involved_indices
             final_df <- get_involved_indices(index_name)
             if(self$verbose){
+                message(" -> Requesting indices: ", index_name)
                 # 
                 final_df %>% 
                     names() %>% 
                     paste0(collapse = ", ") %>% 
-                    paste0("Indices involved: ", .) %>%
-                    message()
-                # first requests can be long, warn user
-                message("Elasticsearch is parsing requests...")
+                    message(" -> Matching indices: ", .)
             }
             # various infos per index
             run_infos <- final_df
@@ -2845,6 +2903,7 @@ Kibior <- R6Class(
             }
 
             # per index, first search config
+            if(self$verbose) message(" -> Getting search results:")
             for(current_index in names(run_infos)){
 
                 # first search, init scroll and manage error
@@ -2874,40 +2933,35 @@ Kibior <- R6Class(
                         stop(msg)
                     }
                 )
-
-                if(self$verbose){
-                    message("- [", current_index, "]")
-                }
                 # check total hits
                 run_infos[[current_index]][["total_hits"]] <- get_total_records(search_res$hits$total)
-                if(self$verbose){
-                    message("   Total hits: ", run_infos[[current_index]][["total_hits"]])
-                }
                 # no results
                 if(length(search_res$hits$hits) == 0){
                     run_infos[[current_index]][["end_reached"]] <- FALSE
                 }
-                
                 # max threshold
                 tmp_threshold <- if(purrr::is_null(max_size)) run_infos[[current_index]][["total_hits"]] else max_size
                 if(head && tmp_threshold > self$head_search_size){
                     tmp_threshold <- self$head_search_size
                 } 
                 run_infos[[current_index]][["threshold"]] <- tmp_threshold
-                if(self$verbose){
-                    message("   Threshold: ", run_infos[[current_index]][["threshold"]])
-                }
-                
                 # scroll id
                 run_infos[[current_index]][["scroll_id"]] <- search_res[["_scroll_id"]]
-
                 # timer 
                 run_infos[[current_index]][["timer"]] <- 0
-
                 # last hits
                 run_infos[[current_index]][["hits"]] <- extract_ids(search_res$hits$hits)
-            }
 
+                # msg
+                if(self$verbose){
+                    index_hits_asked <- run_infos[[current_index]][["threshold"]]
+                    index_hits_total <- run_infos[[current_index]][["total_hits"]]
+                    paste0("   - ", current_index, ": ") %>%
+                        paste0(if(index_hits_asked > index_hits_total) index_hits_total else index_hits_asked) %>%
+                        paste0("/", index_hits_total) %>%
+                        message()
+                }
+            }
 
             # base args for inc loops
             base_args = list(
@@ -2917,20 +2971,6 @@ Kibior <- R6Class(
                 verbose = FALSE, 
                 callopts=list(verbose=FALSE)
             )
-
-            # verbose total hits info
-            if(self$verbose){
-                cumul_total_hits <- run_infos %>% 
-                    lapply(function(x){ 
-                        x[["total_hits"]]
-                    }) %>% 
-                    unlist(use.names = FALSE) %>%
-                    sum()
-                message("Total hits: ", cumul_total_hits)
-                if(!head && !purrr::is_null(max_size)){
-                    message("Max size asked: ", max_size)
-                }
-            }
 
             # progress bar init
             if(!head && !self$quiet_progress){
@@ -2960,6 +3000,8 @@ Kibior <- R6Class(
                     # first search check
                     if(length(run_infos[[current_index]][["hits"]]) == 0) {
                         run_infos[[current_index]][["end_reached"]] <- TRUE
+                        # Stop the clock
+                        run_infos[[current_index]][["timer"]] <- proc.time() - run_infos[[current_index]][["timer"]]
                     }
 
                     # if end not reached for this index, explore
@@ -2990,6 +3032,8 @@ Kibior <- R6Class(
                             final_df[[ current_index ]] <- raw
                             # end
                             run_infos[[current_index]][["end_reached"]] <- TRUE
+                            # Stop the clock
+                            run_infos[[current_index]][["timer"]] <- proc.time() - run_infos[[current_index]][["timer"]]
                             #
                             nb_hits <- 1
 
@@ -3039,25 +3083,19 @@ Kibior <- R6Class(
                         # test end
                         if(nrow(final_df[[current_index]]) >= run_infos[[current_index]][["threshold"]]){
                             run_infos[[current_index]][["end_reached"]] <- TRUE
+                            # Stop the clock
+                            run_infos[[current_index]][["timer"]] <- proc.time() - run_infos[[current_index]][["timer"]]
 
                         } else {
                             # continue search scroll
                             search_res <- elastic::scroll(self$connection, 
                                                         run_infos[[current_index]][["scroll_id"]], 
                                                         time_scroll = scroll_timer)
-
                             tmp_ids <- extract_ids(search_res$hits$hits)
                             run_infos[[current_index]][["hits"]] <- tmp_ids
                             run_infos[[current_index]][["end_reached"]] <- (length(tmp_ids) == 0)
                         }
 
-                    }
-
-                    # if end reached for this index
-                    if(run_infos[[current_index]][["end_reached"]]){
-                        # Stop the clock
-                        run_infos[[current_index]][["timer"]] <- proc.time() - run_infos[[current_index]][["timer"]]
-                        
                     }
                 }
 
@@ -3070,20 +3108,30 @@ Kibior <- R6Class(
 
             # verbose time
             if(self$verbose){
+                # CR after progress bar
                 message()
+                # has scroll pending?
+                message(" -> Closing scrolls: ")
                 for(current_index in names(final_df)){
                     # close scroll
-                    if(!elastic::scroll_clear(self$connection, run_infos[[current_index]][["scroll_id"]])){
-                        message("[", current_index, "] implicite scroll closing pending.")
-                    }
-                    #
-                    user_took <- { 
-                            run_infos[[current_index]][["timer"]][["elapsed"]] * 1000 
-                        } %>% 
-                        private$humanize_mstime()
-                    message("[", current_index, "] execution time: ", user_took$time, user_took$unit)
-
+                    run_infos[[current_index]][["scroll_id"]] %>%
+                        elastic::scroll_clear(self$connection, x = ., all = FALSE) %>% 
+                        (function(x){ if(x) "closed" else "implicit closing pending" }) %>%
+                        message("   - ", current_index, ": ", .)
                 }
+                # execution
+                message(" -> Execution time: ")
+                execution_total <- 0
+                for(current_index in names(final_df)){
+                    # calculate
+                    user_took <- run_infos[[current_index]][["timer"]][["elapsed"]] %>%
+                        private$humanize_time()
+                    message("   - ", current_index, ": ", user_took$time, user_took$unit)
+                    # total
+                    execution_total <- execution_total + run_infos[[current_index]][["timer"]][["elapsed"]]
+                }
+                total_took <- private$humanize_time(execution_total)
+                message("   - total: ", total_took$time, total_took$unit)
             }
 
             # close progress bar

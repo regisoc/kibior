@@ -163,7 +163,7 @@ dept <- list(
 join_fields <- c("dept_name" = "name")
 
 # use with quosure "!!"
-query_local <- quo(dept_name %in% c("Finance", "Sales"))
+query_local <- dplyr::quo(dept_name %in% c("Finance", "Sales"))
 query_remote <- "dept_name:(finance || sales)"
 
 
@@ -210,10 +210,7 @@ push_test_datasets <- function(recreate = TRUE){
 
 
 
-
-message()
 message("Data will be push to Elasticsearch to setup test env")
-message()
 message("----------------------------------")
 message()
 
