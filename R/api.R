@@ -520,26 +520,29 @@ Kibior <- R6Class(
                     xclass <- "factor"
                 }
                 switch(xclass,
-                    "NULL"      = { stop("The column '", y, "' contains only NULL values. Remove it before pushing.") },
+                    "NULL" = {
+                        stop("The column '", y, "' contains only NULL values. Remove it before pushing.")
+                    },
                     # text types
-                    "factor"    = { text_type },
-                    "character" = { text_type },
-                    "AsIs"      = { text_type },
-                    "logical"   = { text_type },
+                    "factor"     = { text_type },
+                    "character"  = { text_type },
+                    "AsIs"       = { text_type },
+                    "logical"    = { text_type },
                     # numerical types
-                    "numeric"   = { numeric_type },
-                    "integer"   = { numeric_type },
-                    "double"    = { numeric_type },
+                    "numeric"    = { numeric_type },
+                    "integer"    = { numeric_type },
+                    "double"     = { numeric_type },
                     # in case of list, get the type of the first non null value 
-                    "list"      = { map_types(unlist(x, use.names = FALSE)[[1]], y) },
+                    "list"       = { map_types(unlist(x, use.names = FALSE)[[1]], y) },
                     # data.frame
-                    "data.frame"= { stop("Data contains multiple levels of dataframes, which are not handled by Kibior") },
+                    "data.frame" = {
+                        stop("Data contains multiple levels of dataframes, which are not handled by Kibior") 
+                    },
                     # all others
                     stop("Unknown type '", xclass, "' when creating Elasticsearch mapping")
                 )
             }
             # return mapping body
-            # lapply(data, map_types) %>%
             purrr::imap(data, map_types) %>%
                 list(properties = .)
         },
@@ -564,7 +567,7 @@ Kibior <- R6Class(
             if(self$verbose) message(" -> Applying mapping to '", index_name, "'")
             mapping <- private$define_mappings(data)
             # req
-            if(self$verbose) message(" -> Trying without type insertion (ES > v7)... ", appendLF = FALSE)
+            if(self$verbose) message("   - Trying without type insertion (ES > v7)... ", appendLF = FALSE)
             res <- tryCatch(
                 expr = {
                     # do not insert mapping type
@@ -580,7 +583,7 @@ Kibior <- R6Class(
                     if(self$verbose) message("nok")
                     if(grepl("mapping type is missing", e$message, ignore.case = TRUE)){
                         # older ES version < 7, try another time with mapping types
-                        if(self$verbose) message(" -> Trying with type insertion (ES < v7)... ", appendLF = FALSE)
+                        if(self$verbose) message("   - Trying with type insertion (ES < v7)... ", appendLF = FALSE)
                         # with type
                         res <- tryCatch(
                             expr = {
@@ -2435,7 +2438,20 @@ Kibior <- R6Class(
                 # remove empty columns from data
                 data <- data[-which(cols_empty)]
             }
-            
+            # ------------------
+            # Listed columns containing NA/NULL changed to "" (empty string)
+            list_col_names <- data %>% 
+                sapply(purrr::is_list) %>% 
+                data[.] %>% 
+                names
+            if(self$verbose){
+                list_col_names %>% 
+                    paste0(collapse = ", ") %>%
+                    message(" -> Adapting NULL/NA to empty strings values from columns: ", .)
+            }
+            data <- data %>% 
+                dplyr::mutate_at(vars(list_col_names), tidyr::replace_na, "") %>% 
+                dplyr::as_tibble()
             # -----------------------------------------
             # DEFINE AND APPLY MAPPING
             # process: create index and mapping
@@ -2460,11 +2476,6 @@ Kibior <- R6Class(
                 # control result
                 if(purrr::is_null(mapping_res) || !mapping_res$acknowledged) stop(err_msg)
             }
-
-
-            data %>% dplyr::as_tibble() %>% print()
-
-
             # -----------------------------------------
             # SEND DATA
             # prepare
@@ -2494,12 +2505,21 @@ Kibior <- R6Class(
             clock_start <- proc.time()
             bulks_res <- suppressWarnings({ 
                 # suppress warnings caused by type removal deprecation in ES 6 and 7
-                do.call(bulk_method, args) 
+                rr <- do.call(bulk_method, args)
+                rr[[1]]
             })
             elapsed <- proc.time() - clock_start
+            # some errors during data transfer
+            if(bulks_res[["errors"]]){
+                msg_errors <- bulks_res$items %>%
+                    lapply(function(x){ x[["index"]][["error"]][["reason"]] }) %>%
+                    unlist(use.names = FALSE) %>% 
+                    paste0(collapse = ", ") %>%
+                    warning("Some errors happenned during data transfer: ", .)
+            }
             # verbose
             if(self$verbose){
-                es_took <- lapply(bulks_res, function(x){ x[["took"]] }) %>%
+                es_took <- bulks_res[["took"]] %>% 
                     unlist(use.names = FALSE) %>%
                     sum() %>%
                     as.double() %>%
@@ -2883,7 +2903,6 @@ Kibior <- R6Class(
                     }) %>% 
                     unlist(use.names = FALSE)
             }
-
             # involved_indices
             final_df <- get_involved_indices(index_name)
             if(self$verbose){
