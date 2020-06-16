@@ -162,7 +162,9 @@ Kibior <- R6Class(
             "frn"   = "sequences",
             # reads
             "fastq" = "reads", 
-            "fq"    = "reads"
+            "fq"    = "reads",
+            # json
+            "json"  = "json"
             # "sam" = alignments,
             # # TODO: test
             # # variant
@@ -1913,14 +1915,13 @@ Kibior <- R6Class(
         #' # export from in-memory data to a file
         #' kc$export(data = dplyr::starwars, filepath = f, force = TRUE)
         #'
-        #' @param data an index name or in-memory data to be extracted to a file (default: NULL).
-        #' @param filepath the filepath to use as export, must contain the file extention (default: 
-        #'  NULL).
+        #' @param data an index name or in-memory data to be extracted to a file.
+        #' @param filepath the filepath to use as export, must contain the file extention.
         #' @param force overwrite the file? (default: FALSE).
         #'
         #' @return the filepath if correctly exported, else an error
         #'
-        export = function(data = NULL, filepath = NULL, force = FALSE){
+        export = function(data, filepath, force = FALSE){
             if(purrr::is_null(data)) stop(private$err_empty_data("data"))
             if(purrr::is_null(filepath)) stop(private$err_null_forbidden("filepath"))
             if(!purrr::is_logical(force)) stop(private$err_param_type_logical("force"))
@@ -1952,14 +1953,13 @@ Kibior <- R6Class(
         #' # import raw data
         #' kc$import_tabular(filepath = f, to_tibble = FALSE)
         #'
-        #' @param filepath the filepath to use as import, must contain the file extention (default: 
-        #'  NULL).
+        #' @param filepath the filepath to use as import, must contain the file extention.
         #' @param to_tibble returns the result as tibble? If FALSE, the raw default rio::import() 
         #'  format will be used (default: TRUE).
         #'
         #' @return data contained in the file as a tibble, or NULL.
         #'
-        import_tabular = function(filepath = NULL, to_tibble = TRUE){
+        import_tabular = function(filepath, to_tibble = TRUE){
             # check pkg
             Kibior$.install_packages("rio")
             # do import
@@ -1989,14 +1989,13 @@ Kibior <- R6Class(
         #' kc$import_features(filepath = f_bed, to_tibble = FALSE)
         #' kc$import_features(filepath = f_gff, to_tibble = FALSE)
         #'
-        #' @param filepath the filepath to use as import, must contain the file extention (default: 
-        #'  NULL).
+        #' @param filepath the filepath to use as import, must contain the file extention.
         #' @param to_tibble returns the result as tibble? If FALSE, the raw default 
         #'  rtracklayer::import() format will be used (default: TRUE).
         #'
         #' @return data contained in the file as a tibble, or NULL.
         #'
-        import_features = function(filepath = NULL, to_tibble = TRUE){
+        import_features = function(filepath, to_tibble = TRUE){
             Kibior$.install_packages("rtracklayer")
             rtracklayer::import(filepath) %>% 
                 (function(features){
@@ -2021,20 +2020,48 @@ Kibior <- R6Class(
         #' # import raw data
         #' kc$import_alignments(filepath = f_bai, to_tibble = FALSE)
         #'
-        #' @param filepath the filepath to use as import, should contain the file extention (default: 
-        #'  NULL).
+        #' @param filepath the filepath to use as import, should contain the file extention.
         #' @param to_tibble returns the result as tibble? If FALSE, the raw default 
         #'  Rsamtools::scanBam() format will be used (default: TRUE).
         #'
         #' @return data contained in the file as a tibble, or NULL.
         #'
-        import_alignments = function(filepath = NULL, to_tibble = TRUE){
+        import_alignments = function(filepath, to_tibble = TRUE){
             # check pkg
             Kibior$.install_packages("Rsamtools")
             # do the job
             Rsamtools::scanBam(filepath) %>%
                 (function(bam){
                     if(to_tibble) self$bam_to_tibble(bam) else bam
+                })
+        },
+
+        #' @details
+        #' Import method for JSON format.
+        #'
+        #' @family move-data
+        #'
+        #' @examples
+        #' # get sample file
+        #' f_json <- system.file("extdata", "storms100.json", package = "kibior")
+        #' # import to in-memory variable
+        #' kc$import_json(f_json)
+        #' # import raw data
+        #' kc$import_json(f_json, to_tibble = FALSE)
+        #'
+        #' @param filepath the filepath to use as import, should contain the file extention.
+        #' @param to_tibble returns the result as tibble? If FALSE, the raw dataframe format 
+        #'  will be used (default: TRUE).
+        #'
+        #' @return data contained in the file as a tibble, dataframe or NULL.
+        #'
+        import_json = function(filepath, to_tibble = TRUE){
+            # check pkg
+            Kibior$.install_packages("jsonlite")
+            # do the job
+            jsonlite::fromJSON(filepath) %>% 
+                (function(x){
+                    if(to_tibble) dplyr::as_tibble(x) else x
                 })
         },
 
@@ -2056,15 +2083,14 @@ Kibior <- R6Class(
         #' # import auto
         #' kc$import_sequences(filepath = f_aa)
         #'
-        #' @param filepath the filepath to use as import, should contain the file extention (default: 
-        #'  NULL).
+        #' @param filepath the filepath to use as import, should contain the file extention.
         #' @param to_tibble returns the result as tibble? If FALSE, the raw default 
         #'  Rsamtools::scanBam() format will be used (default: TRUE).
         #' @param fasta_type type of parsing. It can be "dna", "rna", "aa" ou "auto" (default: "auto")
         #'
         #' @return data contained in the file as a tibble, or NULL.
         #'
-        import_sequences = function(filepath = NULL, to_tibble = TRUE, fasta_type = "auto"){
+        import_sequences = function(filepath, to_tibble = TRUE, fasta_type = "auto"){
             if(!(fasta_type %in% c("auto", "dna", "rna", "aa"))){
                 stop("Needed fasta_type to be one of 'dna', 'rna','aa' ou 'auto'")
             }
@@ -2128,13 +2154,12 @@ Kibior <- R6Class(
         #' kc$guess_import(f_gff)
         #' kc$guess_import(f_bed)
         #'
-        #' @param filepath the filepath to use as import, must contain the file extention (default: 
-        #'  NULL).
+        #' @param filepath the filepath to use as import, must contain the file extention.
         #' @param to_tibble returns the result as tibble? (default: TRUE).
         #'
         #' @return data contained in the file, or NULL.
         #'
-        guess_import = function(filepath = NULL, to_tibble = TRUE){
+        guess_import = function(filepath, to_tibble = TRUE){
             # 
             guess_import_method <- function(f, rm_compression_extension = FALSE){
                 "f can be an url or a fs path."
@@ -2174,7 +2199,8 @@ Kibior <- R6Class(
                             "features"  = { self$import_features },
                             "alignments"= { self$import_alignments },
                             "sequences" = { self$import_sequences },
-                            stop(paste0(private$ERR_WTF, "\nFound type: ", type, "\n"))
+                            "json"      = { self$import_json },
+                            stop(paste0(private$ERR_WTF, " Uknown type: ", type))
                         )
                         do.call(what = m, args = args)
                     })
@@ -2219,8 +2245,7 @@ Kibior <- R6Class(
         #' kc$import(filepath = f_gff, import_mode = "remote", push_index = "sw_from_file",
         #'  push_mode = "recreate")
         #'
-        #' @param filepath the filepath to use as import, must contain the file extention (default: 
-        #'  NULL).
+        #' @param filepath the filepath to use as import, must contain the file extention.
         #' @param import_type can be one of "auto", "tabular", "features", "alignments", "sequences" (default: "auto").
         #' @param import_mode can be "local" to get file data, "remote" to immediatly push them to 
         #'  Elasticsearch, "both" to push and pull. (default: "local").
@@ -2231,7 +2256,7 @@ Kibior <- R6Class(
         #'
         #' @return data contained in the file, or NULL.
         #'
-        import = function(filepath = NULL, import_type = "auto", import_mode = "local", push_index = NULL, push_mode = "check", id_col = NULL, to_tibble = TRUE){
+        import = function(filepath, import_type = "auto", import_mode = "local", push_index = NULL, push_mode = "check", id_col = NULL, to_tibble = TRUE){
             if(!purrr::is_character(filepath)) stop(private$err_param_type_character("filepath"))
             if(length(filepath) > 1) stop(private$err_one_value("filepath"))
             if(!(import_mode %in% private$.VALID_IMPORT_MODES)) stop(private$err_not_in_vector("import_mode", private$.VALID_IMPORT_MODES))
@@ -2360,7 +2385,7 @@ Kibior <- R6Class(
                 {. == "data.frame"} %>% 
                 any()
             if(has_df_type){
-                if(self$verbose) message(" -> Flattening columns that have sub-dataframes")
+                if(self$verbose) message(" -> Flattening columns having sub-dataframes")
                 data <- jsonlite::flatten(data)
             }
 
@@ -2444,14 +2469,16 @@ Kibior <- R6Class(
                 sapply(purrr::is_list) %>% 
                 data[.] %>% 
                 names
-            if(self$verbose){
-                list_col_names %>% 
-                    paste0(collapse = ", ") %>%
-                    message(" -> Adapting NULL/NA to empty strings values from columns: ", .)
+            if(length(list_col_names) > 0){
+                if(self$verbose){
+                    list_col_names %>% 
+                        paste0(collapse = ", ") %>%
+                        message(" -> Adapting NULL/NA to empty strings values from columns: ", .)
+                }
+                data <- data %>% 
+                    dplyr::mutate_at(vars(list_col_names), tidyr::replace_na, "") %>% 
+                    dplyr::as_tibble()
             }
-            data <- data %>% 
-                dplyr::mutate_at(vars(list_col_names), tidyr::replace_na, "") %>% 
-                dplyr::as_tibble()
             # -----------------------------------------
             # DEFINE AND APPLY MAPPING
             # process: create index and mapping
@@ -2627,7 +2654,9 @@ Kibior <- R6Class(
         #'
         #' @return the reindex result
         #'
-        move = function(from_instance = NULL, from_index = NULL, to_index = NULL, force = FALSE, copy = FALSE){
+        move = function(from_index, to_index, from_instance = NULL, force = FALSE, copy = FALSE){
+            if(missing(from_index)) stop("")
+            if(missing(to_index)) stop("")
             if(!purrr::is_null(from_instance) && !Kibior$is_instance(from_instance)) stop("Need a Kibior instance type or NULL.")
             is_local <- purrr::is_null(from_instance)
             # select source instance
@@ -2637,7 +2666,7 @@ Kibior <- R6Class(
             if(!purrr::is_character(to_index)) stop(private$err_param_type_character("to_index"))
             if(length(to_index) > 1) stop(private$err_one_value("to_index"))
             if(!purrr::is_logical(force)) stop(private$err_param_type_logical("force"))
-            if(is.na(force)) stop("force")
+            if(is.na(force)) stop(private$err_logical_na("force"))
             if(is_local && from_index == to_index) stop("Source and destination indices are the same.")
             if(!source_instance$has(from_index)) stop(private$err_index_unknown(from_index))
             if(!force && self$has(to_index)) stop(private$err_index_already_exists(to_index))
@@ -2689,7 +2718,7 @@ Kibior <- R6Class(
             if(!copy) source_instance$delete(from_index)
             # msg
             if(self$verbose){
-                t <- private$humanize_time(res$took)
+                t <- {res$took / 1000} %>% private$humanize_time()
                 message("Documents transfered: ", res$total, ", took: ", t$time, t$unit)
             }
             Sys.sleep(self$elastic_wait)
@@ -2722,7 +2751,7 @@ Kibior <- R6Class(
         #'
         #' @return the reindex result
         #'
-        copy = function(from_instance = NULL, from_index = NULL, to_index = NULL, force = FALSE){
+        copy = function(from_index, to_index, from_instance = NULL, force = FALSE){
             args <- list(
                 from_instance = from_instance, 
                 from_index = from_index, 
@@ -2920,7 +2949,6 @@ Kibior <- R6Class(
                 run_infos[[i]][["total_hits"]] <- NA
                 run_infos[[i]][["threshold"]] <- NA
             }
-
             # per index, first search config
             if(self$verbose) message(" -> Getting search results:")
             for(current_index in names(run_infos)){
