@@ -18,7 +18,9 @@
 #' @importFrom purrr is_null is_list is_character is_logical
 #' @importFrom jsonlite fromJSON
 #' @importFrom rio export import
-#' @importFrom dplyr select filter as_tibble
+#' @importFrom tibble as_tibble
+#' @importFrom dplyr select filter
+#' @importFrom tidyr replace_na
 #' @importFrom magrittr %>%
 #' @importFrom data.table rbindlist
 #' @importFrom elastic mapping_create index_forcemerge index_optimize index_flush index_clear_cache index_open index_close connect index_recreate index_create index_delete cluster_stats index_get docs_bulk_update docs_bulk_index reindex Search docs_mget scroll scroll_clear
@@ -337,7 +339,7 @@ Kibior <- R6Class(
                     index_data <- index %>%
                         dplyr::select( if(purrr::is_null(columns)) dplyr::everything() else columns ) %>%
                         (function(x){ if(!purrr::is_null(max_size)) head(x, max_size) else x }) %>%
-                        dplyr::as_tibble(.name_repair = "unique")
+                        tibble::as_tibble(.name_repair = "unique")
                 }
                 # ret
                 index_data
@@ -450,6 +452,9 @@ Kibior <- R6Class(
                 paste0(collapse = "', '") %>% 
                 paste0("'", ., "'")
         },
+
+        
+
 
         # --------------------------------------------------------------------------
         # methods - Elastic utils
@@ -1229,7 +1234,7 @@ Kibior <- R6Class(
         #' kc <- .kibior_get_instance_from_env()
         #' kc$quiet_progress <- TRUE
         #'
-        #' # preparing all examples (do not mind this)
+        #' # preparing all examples (do not mind this for this method)
         #' if(kc$has("aaa")) kc$delete("aaa")
         #' if(kc$has("bbb")) kc$delete("bbb")
         #' if(kc$has("ccc")) kc$delete("ccc")
@@ -1296,7 +1301,7 @@ Kibior <- R6Class(
         #'
         #' @examples
         #' kc$eq(kc)
-        #' 
+        #'
         eq = function(other = NULL){
             if(!Kibior$is_instance(other)) stop(private$err_not_kibior_instance("other"))
             r <- (self$host == other$host && self$port == other$port)
@@ -1797,41 +1802,52 @@ Kibior <- R6Class(
         #' kc$keys("sw", "eye_color")
         #'
         #' @param index_name an index name (default: NULL).
-        #' @param columns a field name of this index (default: NULL).
+        #' @param column a field name of this index (default: NULL).
         #'
         #' @return a vector of keys values from this field/column
         #'
         # TODO test
-        keys = function(index_name = NULL, columns = NULL){
+        keys = function(index_name = NULL, column = NULL){
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
             if(length(index_name) > 1) stop(private$err_one_value("index_name"))
             if(private$is_search_pattern(index_name)) stop(private$err_search_pattern_forbidden("index_name"))
-            if(!purrr::is_character(columns)) stop(private$err_param_type_character("columns"))
-            if(length(columns) > 1) stop(private$err_one_value("columns"))
-            if(!(columns %in% self$columns(index_name)[[index_name]])) stop(private$err_field_unknown(index_name, columns))
+            if(!purrr::is_character(column)) stop(private$err_param_type_character("column"))
+            if(length(column) > 1) stop(private$err_one_value("column"))
+            if(!(column %in% self$columns(index_name)[[index_name]])) stop(private$err_field_unknown(index_name, column))
 
             # TODO
             # need to be changed to composite aggr.
             # https://www.elastic.co/guide/en/elasticsearch/reference/6.8/search-aggregations-bucket-composite-aggregation.html
 
             # request
-            body = list(
-                "size" = 0,
-                "aggs" = list(
-                    "kaggs" = list(
-                        "terms" = list(
-                            "field" = paste0(columns, ".keyword")
+            req <- function(target_field){
+                body = list(
+                    "size" = 0,
+                    "aggs" = list(
+                        "kaggs" = list(
+                            "terms" = list(
+                                "field" = target_field
+                            )
                         )
                     )
                 )
-            )
-            r <- elastic::Search(self$connection, 
-                                index_name = index_name, 
-                                size = 0, 
-                                body = body)
-            r$aggregations$kaggs$buckets %>% 
-                lapply(function(x){ x$key }) %>% 
-                unlist()
+                r <- elastic::Search(self$connection, 
+                                    index_name = index_name, 
+                                    size = 0, 
+                                    body = body)
+                r$aggregations$kaggs$buckets %>% 
+                    lapply(function(x){ x$key }) %>% 
+                    unlist()
+            }
+            # test with keyword field (string field)
+            if(self$verbose) message(" -> Looking for '", column, ".keyword' column keys")
+            res <- column %>% paste0(".keyword") %>% req()
+            # test if null, might try without keyword
+            if(purrr::is_null(res)){
+                if(self$verbose) message(" -> Looking for '", column, "' column keys")
+                res <- column %>% req()
+            }
+            if(self$quiet_results) invisible(res) else res
         },
 
 
@@ -1855,6 +1871,11 @@ Kibior <- R6Class(
             self$keys(index_name = index_name, 
                     columns = columns)
         },
+
+
+        # --------------------------------------------------------------------------
+        # methods - Data transformation
+        # --------------------------------------------------------------------------
 
 
         #' @details
@@ -1892,7 +1913,79 @@ Kibior <- R6Class(
                 }) %>% 
                 do.call(data.frame, .)
             names(bam_df) <- bam_field
-            dplyr::as_tibble(bam_df, .name_repair = "unique")
+            tibble::as_tibble(bam_df, .name_repair = "unique")
+        },
+
+        #' @details
+        #' Casting function that tries to cast a transformation closure. Uses 
+        #'  tibble::as_tibble() by default.
+        #'
+        #' @family data-manipulation
+        #'
+        #' @examples
+        #' 
+        #'
+        #' @param data data to cast.
+        #' @param caster the caster closure/function (default: tibble::as_tibble)
+        #' @param caster_args others caster args (default: list(.name_repair = "unique"))
+        #' @param warn do print warning if error? (default: TRUE)
+        #'
+        #' @return a cast or the unchanged data.
+        #'
+        # TODO test
+        soft_cast = function(data, caster = getFromNamespace("as_tibble", "tibble"), caster_args = list(.name_repair = "unique"), warn = TRUE){
+            if(!("closure" %in% typeof(caster))){
+                stop("Transformation function need to be a closure/function")
+            }
+            # 
+            tryCatch(
+                expr = {
+                    do.call(caster, c(data, caster_args))
+                }, 
+                error = function(e){
+                    if(warn) warning("Cannot cast, no changes applied")
+                    if(self$verbose) message(e, "\n")
+                    data
+                }
+            )
+        },
+
+        #' @details
+        #' Get a local filepath or an URL data through a tempfile. If the file
+        #'  exists locally, the filepath will be returned, if not, it will tries
+        #'  to download the data and return the temp filepath.
+        #'
+        #' @family data-manipulation
+        #'
+        #' @examples
+        #' 
+        #'
+        #' @param url_or_filepath a filepath or an URL.
+        #'
+        #' @return a filepath.
+        #'
+        # TODO test
+        get_resource = function(url_or_filepath){
+            if(file.exists(url_or_filepath)){
+                # file exists
+                url_or_filepath
+            } else {
+                # not local
+                if(self$verbose) message("Filepath does not exist locally, trying download...")
+                tryCatch(
+                    expr = {
+                        f <- tempfile()
+                        download.file(url_or_filepath, f)
+                        f
+                    },
+                    error = function(e){
+                        message(e)
+                    },
+                    warning = function(w){
+                        message(w)
+                    }
+                )
+            }
         },
 
 
@@ -1917,11 +2010,12 @@ Kibior <- R6Class(
         #'
         #' @param data an index name or in-memory data to be extracted to a file.
         #' @param filepath the filepath to use as export, must contain the file extention.
+        #' @param format the file format to use (default: "csv").
         #' @param force overwrite the file? (default: FALSE).
         #'
         #' @return the filepath if correctly exported, else an error
         #'
-        export = function(data, filepath, force = FALSE){
+        export = function(data, filepath, format = "csv", force = FALSE){
             if(purrr::is_null(data)) stop(private$err_empty_data("data"))
             if(purrr::is_null(filepath)) stop(private$err_null_forbidden("filepath"))
             if(!purrr::is_logical(force)) stop(private$err_param_type_logical("force"))
@@ -1935,7 +2029,7 @@ Kibior <- R6Class(
             # data can be a in-memory dataset, or a name of an index in ES
             dataset <- if(purrr::is_character(data)) self$pull(index_name = data)[[data]] else data
             # write to file
-            res <- rio::export(x = dataset, file = filepath)
+            res <- rio::export(x = dataset, file = filepath, format = format)
             if(self$quiet_results) invisible(res) else res
         },
 
@@ -1963,12 +2057,11 @@ Kibior <- R6Class(
             # check pkg
             Kibior$.install_packages("rio")
             # do import
-            rio::import(file = filepath) %>% 
-                (function(table){
-                    if(to_tibble){
-                        table <- dplyr::as_tibble(table, .name_repair = "unique")
-                    }
-                    table
+            filepath %>% 
+                self$get_resource() %>%
+                rio::import() %>%
+                (function(x){
+                    if(to_tibble) self$soft_cast(x) else x
                 })
         },
 
@@ -1997,12 +2090,11 @@ Kibior <- R6Class(
         #'
         import_features = function(filepath, to_tibble = TRUE){
             Kibior$.install_packages("rtracklayer")
-            rtracklayer::import(filepath) %>% 
-                (function(features){
-                    if(to_tibble){
-                        features <- dplyr::as_tibble(features, .name_repair = "unique")
-                    }
-                    features
+            filepath %>% 
+                self$get_resource() %>%
+                rtracklayer::import() %>%
+                (function(x){
+                    if(to_tibble) self$soft_cast(x) else x
                 })
         },
 
@@ -2030,9 +2122,11 @@ Kibior <- R6Class(
             # check pkg
             Kibior$.install_packages("Rsamtools")
             # do the job
-            Rsamtools::scanBam(filepath) %>%
-                (function(bam){
-                    if(to_tibble) self$bam_to_tibble(bam) else bam
+            filepath %>%
+                self$get_resource() %>% 
+                Rsamtools::scanBam() %>%
+                (function(x){
+                    if(to_tibble) self$soft_cast(x, caster = self$bam_to_tibble) else x
                 })
         },
 
@@ -2058,10 +2152,11 @@ Kibior <- R6Class(
         import_json = function(filepath, to_tibble = TRUE){
             # check pkg
             Kibior$.install_packages("jsonlite")
-            # do the job
-            jsonlite::fromJSON(filepath) %>% 
+            filepath %>% 
+                self$get_resource() %>% 
+                jsonlite::fromJSON() %>% 
                 (function(x){
-                    if(to_tibble) dplyr::as_tibble(x) else x
+                    if(to_tibble) self$soft_cast(x) else x
                 })
         },
 
@@ -2097,36 +2192,30 @@ Kibior <- R6Class(
             # add parameter (, with.qualities=FALSE) for readXStringSet function
             # check pkg
             Kibior$.install_packages("Biostrings")
-            # methods
-            string_set_to_df <- function(ss){
-                data.frame(
-                    width = Biostrings::width(ss), 
-                    seq = as.character(ss), 
-                    names = names(ss)
-                )
-            }
-            # file exists?
-            if(!file.exists(filepath)){
-                f <- tempfile()
-                download.file(filepath, f)
-            } else {
-                f <- filepath
-            }
-            # select mode
-            r <- switch(fasta_type,
-                "dna"   = { Biostrings::readDNAStringSet(f) },
-                "rna"   = { Biostrings::readRNAStringSet(f) },
-                "aa"    = { Biostrings::readAAStringSet(f) },
-                "auto"  = { Biostrings::readBStringSet(f) },
-                stop("Unknown fasta option '", fasta_type, "'.")
-            )
-            # tibble
-            if(to_tibble){
-                r <- r %>%
-                    string_set_to_df() %>% 
-                    dplyr::as_tibble(.name_repair = "unique")
-            }
-            r
+            filepath %>% 
+                # choose type
+                (function(x){
+                    switch(fasta_type,
+                        "dna"   = { Biostrings::readDNAStringSet(x) },
+                        "rna"   = { Biostrings::readRNAStringSet(x) },
+                        "aa"    = { Biostrings::readAAStringSet(x) },
+                        "auto"  = { Biostrings::readBStringSet(x) },
+                        stop("Unknown fasta option '", fasta_type, "'.")
+                    )
+                }) %>%
+                # cast if needed
+                (function(stringset){
+                    if(to_tibble){
+                        data.frame(
+                            width = Biostrings::width(stringset), 
+                            seq = as.character(stringset), 
+                            names = names(stringset)
+                        ) %>% 
+                            self$soft_cast()
+                    } else {
+                        stringset
+                    }
+                })
         },
 
         #' @details
@@ -2277,6 +2366,7 @@ Kibior <- R6Class(
                 "features"  = { self$import_features },
                 "alignments"= { self$import_alignments },
                 "sequences" = { self$import_sequences },
+                "json"      = { self$import_json },
                 stop(private$ERR_WTF, " Unknown import type '", import_type, "'")
             )
             data <- m(filepath = filepath, to_tibble = to_tibble)
@@ -2292,12 +2382,13 @@ Kibior <- R6Class(
                         data
                     },
                     "remote" = {
-                        self$push(data = data, index_name = push_index, mode = push_mode, id_col = id_col)
+                        data %>% 
+                            self$push(push_index, mode = push_mode, id_col = id_col)
                     },
                     "both" = {
-                        r <- self$push(data = data, index_name = push_index, mode = push_mode, id_col = id_col)
-                        if(r != push_index) stop("Something went wrong when pushing data.")
-                        self$pull(push_index)[[push_index]]
+                        data %>% 
+                            self$push(push_index, mode = push_mode, id_col = id_col) %>% 
+                            self$pull(push_index)[[push_index]]
                     },
                     stop(private$ERR_WTF)
                 )
@@ -2477,7 +2568,7 @@ Kibior <- R6Class(
                 }
                 data <- data %>% 
                     dplyr::mutate_at(vars(list_col_names), tidyr::replace_na, "") %>% 
-                    dplyr::as_tibble()
+                    tibble::as_tibble()
             }
             # -----------------------------------------
             # DEFINE AND APPLY MAPPING
@@ -2901,7 +2992,7 @@ Kibior <- R6Class(
                 # combine to raw_hits
                 workable_hits %>%
                     data.table::rbindlist(use.names = TRUE, fill = FALSE) %>%
-                    dplyr::as_tibble(.name_repair = "unique")
+                    tibble::as_tibble(.name_repair = "unique")
             }
             # function: change column type
             change_column_type <- function(raw){
@@ -3072,7 +3163,7 @@ Kibior <- R6Class(
                                 }) %>%
                                 rbind() %>% 
                                 as.data.frame() %>% 
-                                dplyr::as_tibble() %>%
+                                tibble::as_tibble() %>%
                                 change_column_type()
                             
                             # combne results in one df
