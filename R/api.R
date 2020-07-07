@@ -367,7 +367,7 @@ Kibior <- R6Class(
                 left, 
                 right, 
                 by = by, 
-                suffix = c(".left", ".right")
+                suffix = c("_left", "_right")
             )
             # call to dplyr joins
             join_type %>%
@@ -724,7 +724,8 @@ Kibior <- R6Class(
 
         err_index_unknown = function(index_name){
             "Index unknown"
-            private$vector_to_str(index_name) %>%
+            index_name %>%
+                private$vector_to_str() %>%
                 paste0("One or more indices in [", ., "] are unknown.")
         },
 
@@ -1424,23 +1425,20 @@ Kibior <- R6Class(
         #' @examples
         #' kc$has("aaa")
         #' kc$has(c("bbb", "ccc"))
-        #' kc$has(c("bbb", "ddd"))
         #'
         #' @param index_name a vector of index names to check (default: NULL).
         #'
-        #' @return TRUE if all given index names are present in Elasticsearch, else FALSE
+        #' @return a list with TRUE for found index, else FALSE
         #'
         has = function(index_name = NULL){
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
             if(private$is_search_pattern(index_name)) stop(private$err_search_pattern_forbidden("index_name"))
             # result
-            res <- FALSE
             r <- self$list()
-            if(!purrr::is_null(r)){
-                res <- vapply(index_name,
-                            FUN = function(x){ x %in% r },
-                            FUN.VALUE = logical(1)) %>% all()
-            }
+            res <- vapply(index_name,
+                        FUN = function(x){ x %in% r },
+                        FUN.VALUE = logical(1)) %>% 
+                    as.list()
             if(self$quiet_results) invisible(res) else res
         },
 
@@ -1642,7 +1640,7 @@ Kibior <- R6Class(
         #'
         aliases = function(index_name = NULL){ 
             res <- private$metadata_type(metadata_type = "aliases", 
-                                            index_name = index_name)
+                                        index_name = index_name)
             if(self$quiet_results) invisible(res) else res
         },
 
@@ -1669,7 +1667,11 @@ Kibior <- R6Class(
         #'
         count = function(index_name = NULL, type = "observations", query = NULL){
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
-            if(!self$has(index_name)) stop(private$err_index_unknown(index_name))
+            has_indices <- self$has(index_name)
+            absent_indices <- names(has_indices[has_indices == FALSE])
+            if(length(absent_indices) != 0){
+                stop(private$err_index_unknown(absent_indices))
+            }
             if(length(type) > 1) stop(private$err_one_value("type"))
             if(!(type %in% private$.VALID_COUNT_TYPES)) stop(private$err_not_in_vector("Count type", private$.VALID_COUNT_TYPES))
             if(!purrr::is_null(query)){
@@ -1712,7 +1714,11 @@ Kibior <- R6Class(
         #'
         dim = function(index_name = NULL){
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
-            if(!self$has(index_name)) stop(private$err_index_unknown("index_name"))
+            has_indices <- self$has(index_name)
+            absent_indices <- names(has_indices[has_indices == FALSE])
+            if(length(absent_indices) != 0){
+                stop(private$err_index_unknown(absent_indices))
+            }
             #
             p <- as.list(index_name)
             names(p) <- index_name
@@ -1726,7 +1732,6 @@ Kibior <- R6Class(
                 })
             if(self$quiet_results) invisible(res) else res
         },
-
 
         #' @details
         #' Get fields/columns of indices.
@@ -1744,7 +1749,13 @@ Kibior <- R6Class(
         # TODO test
         columns = function(index_name = NULL){
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
-            if(!private$is_search_pattern(index_name) && !self$has(index_name)) stop(private$err_index_unknown("index_name"))
+            if(!private$is_search_pattern(index_name)){
+                has_indices <- self$has(index_name)
+                absent_indices <- names(has_indices[has_indices == FALSE])
+                if(length(absent_indices) != 0){
+                    stop(private$err_index_unknown(absent_indices))
+                }
+            }
             #
             res <- list()
             tmp <- self$mappings(index_name = index_name)
@@ -1765,7 +1776,6 @@ Kibior <- R6Class(
             }
             if(self$quiet_results) invisible(res) else res
         },
-
 
         #' @details
         #' Get fields/columns of indices.
@@ -2022,7 +2032,11 @@ Kibior <- R6Class(
             if(is.na(force)) stop(private$err_logical_na("force"))
             if(purrr::is_character(data)){
                 if(private$is_search_pattern(data)) stop(private$err_search_pattern_forbidden("data"))
-                if(!self$has(data)) stop(private$err_index_unknown("data"))
+                has_indices <- self$has(data)
+                absent_indices <- names(has_indices[has_indices == FALSE])
+                if(length(absent_indices) != 0){
+                    stop(private$err_index_unknown(absent_indices))
+                }
             }
             if(!force && file.exists(filepath)) stop("File already exists. Use `force = TRUE` to overwrite")
             # 
@@ -2379,7 +2393,7 @@ Kibior <- R6Class(
                 # import mode
                 res <- switch(import_mode,
                     "local" = { 
-                        data
+                        data %>% tibble::as_tibble()
                     },
                     "remote" = {
                         data %>% 
@@ -2388,7 +2402,8 @@ Kibior <- R6Class(
                     "both" = {
                         data %>% 
                             self$push(push_index, mode = push_mode, id_col = id_col) %>% 
-                            self$pull(push_index)[[push_index]]
+                            self$pull() %>%
+                            .[[push_index]]
                     },
                     stop(private$ERR_WTF)
                 )
@@ -2439,10 +2454,20 @@ Kibior <- R6Class(
             if(bulk_size < 1) stop(private$err_param_positive("bulk_size",))
             if(!(mode %in% private$.VALID_PUSH_MODES)) stop(private$err_not_in_vector("mode", private$.VALID_PUSH_MODES))
             if(length(mode) > 1) stop(private$err_one_value("mode"))
-            if(mode == "check" && self$has(index_name)) stop(private$err_index_already_exists(index_name))
+            if(mode == "check"){
+                has_indices <- self$has(index_name)
+                already_there_index <- names(has_indices[has_indices == TRUE])
+                if(length(already_there_index) != 0){
+                    stop(private$err_index_already_exists(already_there_index))
+                }
+            }
             if(mode == "update"){
                 if(purrr::is_null(id_col)) stop("Update mode needs a unique IDs column name.")
-                if(!self$has(index_name)) stop(private$err_index_unknown(index_name))
+                has_indices <- self$has(index_name)
+                absent_indices <- names(has_indices[has_indices == FALSE])
+                if(length(absent_indices) != 0){
+                    stop(private$err_index_unknown(absent_indices))
+                }
             }
             # -----------------------------------------
             # PREPARE DATA 
@@ -2746,8 +2771,6 @@ Kibior <- R6Class(
         #' @return the reindex result
         #'
         move = function(from_index, to_index, from_instance = NULL, force = FALSE, copy = FALSE){
-            if(missing(from_index)) stop("")
-            if(missing(to_index)) stop("")
             if(!purrr::is_null(from_instance) && !Kibior$is_instance(from_instance)) stop("Need a Kibior instance type or NULL.")
             is_local <- purrr::is_null(from_instance)
             # select source instance
@@ -2759,15 +2782,27 @@ Kibior <- R6Class(
             if(!purrr::is_logical(force)) stop(private$err_param_type_logical("force"))
             if(is.na(force)) stop(private$err_logical_na("force"))
             if(is_local && from_index == to_index) stop("Source and destination indices are the same.")
-            if(!source_instance$has(from_index)) stop(private$err_index_unknown(from_index))
-            if(!force && self$has(to_index)) stop(private$err_index_already_exists(to_index))
+            has_indices <- source_instance$has(from_index)
+            absent_indices <- names(has_indices[has_indices == FALSE])
+            if(length(absent_indices) != 0){
+                stop(private$err_index_unknown(absent_indices))
+            }
+            if(!force){
+                has_indices <- self$has(to_index)
+                already_there_indices <- names(has_indices[has_indices == TRUE])
+                if(length(already_there_indices) != 0){
+                    stop(private$err_index_already_exists(already_there_indices))
+                }
+            }
             if(!purrr::is_logical(copy)) stop(private$err_param_type_logical("copy"))
             if(is.na(copy)) stop(private$err_logical_na("copy"))
             # msg
-            action <- if(copy) "Copying" else "Moving" 
-            source_str <- paste0("'" , source_instance$host, ":", source_instance$port, "/", from_index, "'")
-            dest_str <- paste0("'", self$host, ":", self$port, "/", to_index, "'")
-            message(action, " " , source_str, " to ", dest_str)
+            if(self$verbose){
+                action <- if(copy) "Copying" else "Moving" 
+                source_str <- paste0("'" , source_instance$host, ":", source_instance$port, "/", from_index, "'")
+                dest_str <- paste0("'", self$host, ":", self$port, "/", to_index, "'")
+                message(" -> ", action, " " , source_str, " to ", dest_str)
+            }
             # TODO: add "_source" = columns to select only some columns
             # TODO: add "query" = query to execute a query before moving, need to parse query string to struct
             # building args - source subpart
