@@ -255,6 +255,7 @@ kc <- .kibior_get_instance_from_env()
 ```{r kibior-vignette-instance}
 #> Kibior vignette instance: kc
 kc
+
 #> quiet progress bar and verbose mode
 kc$verbose <- FALSE
 kc$quiet_progress <- TRUE
@@ -265,16 +266,16 @@ kc$quiet_progress <- TRUE
 For the sake of readability, we will use **kc** as the generic name for our *example instance of `Kibior`*.
 
 
+
 ```{r hidden-config, echo = FALSE, results = FALSE, message = FALSE, warning = FALSE}
 #> preparing data for the vignette
 
 #> remove unwanted from Elasticsearch
-delete_if_exists <- function(index_name){
-    hi <- kc$has(index_name)
-    # message("index searched: ", index_name, ", found: ", hi)
-    hi[hi == TRUE] %>%
-        names() %>% 
-        kc$delete()
+delete_if_exists <- function(index_names){
+    tryCatch(
+        expr = { kc$delete(index_names) },
+        error = function(e){  }
+    )
 }
 
 c(
@@ -305,6 +306,8 @@ dplyr::storms %>%
 ```
 
 
+
+<br/><br/><br/><br/>
 
 # Deploying an Elasticsearch instance {#deploy-docker}
 
