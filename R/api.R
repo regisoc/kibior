@@ -1236,16 +1236,21 @@ Kibior <- R6Class(
         #' kc$quiet_progress <- TRUE
         #'
         #' # preparing all examples (do not mind this for this method)
-        #' if(kc$has("aaa")) kc$delete("aaa")
-        #' if(kc$has("bbb")) kc$delete("bbb")
-        #' if(kc$has("ccc")) kc$delete("ccc")
-        #' if(kc$has("ddd")) kc$delete("ddd")
-        #' if(kc$has("sw")) kc$delete("sw")
-        #' if(kc$has("sw_naboo")) kc$delete("sw_naboo")
-        #' if(kc$has("sw_tatooine")) kc$delete("sw_tatooine")
-        #' if(kc$has("sw_alderaan")) kc$delete("sw_alderaan")
-        #' if(kc$has("sw_from_file")) kc$delete("sw_from_file")
-        #' if(kc$has("storms")) kc$delete("storms")
+        #' to_delete <- c(
+        #'     "aaa", 
+        #'     "bbb", 
+        #'     "ccc", 
+        #'     "ddd", 
+        #'     "sw", 
+        #'     "sw_naboo", 
+        #'     "sw_tatooine", 
+        #'     "sw_alderaan", 
+        #'     "sw_from_file", 
+        #'     "storms"
+        #' )
+        #' to_delete[kc$has(to_delete)] %>%
+        #'     names() %>%
+        #'     kc$delete()
         #'
         initialize = function(host = "localhost", port = 9200, user = NULL, pwd = NULL, verbose = getOption("verbose")){
             if(purrr::is_null(host)) host <- "localhost"
@@ -1424,7 +1429,7 @@ Kibior <- R6Class(
         #'
         #' @examples
         #' kc$has("aaa")
-        #' kc$has(c("bbb", "ccc"))
+        #' c("bbb", "ccc") %>% kc$has()
         #'
         #' @param index_name a vector of index names to check (default: NULL).
         #'
@@ -1777,24 +1782,6 @@ Kibior <- R6Class(
             if(self$quiet_results) invisible(res) else res
         },
 
-        #' @details
-        #' Get fields/columns of indices.
-        #' Actually a synonym of `$columns()`.
-        #'
-        #' @family crud-metadata
-        #'
-        #' @examples
-        #' kc$fields("sw")          # direct search
-        #' kc$fields("sw_*")        # pattern search
-        #'
-        #' @param index_name a vector of index names, can be a pattern (default: NULL).
-        #'
-        #' @return a list of indices, each containing their fields/columns.
-        #'
-        # TODO test
-        fields = function(index_name = NULL){
-            self$columns(index_name = index_name)
-        },
 
 
         # --------------------------------------------------------------------------
@@ -1803,7 +1790,7 @@ Kibior <- R6Class(
 
 
         #' @details
-        #' Get distinct keys elements of a specific field/column.
+        #' Get distinct keys elements of a specific column.
         #'
         #' @family data-manipulation
         #'
@@ -1813,73 +1800,86 @@ Kibior <- R6Class(
         #'
         #' @param index_name an index name (default: NULL).
         #' @param column a field name of this index (default: NULL).
+        #' @param max_size the maximum result to return (default: 1000).
         #'
         #' @return a vector of keys values from this field/column
         #'
         # TODO test
-        keys = function(index_name = NULL, column = NULL){
+        keys = function(index_name = NULL, column = NULL, max_size = 1000){
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
             if(length(index_name) > 1) stop(private$err_one_value("index_name"))
             if(private$is_search_pattern(index_name)) stop(private$err_search_pattern_forbidden("index_name"))
             if(!purrr::is_character(column)) stop(private$err_param_type_character("column"))
             if(length(column) > 1) stop(private$err_one_value("column"))
             if(!(column %in% self$columns(index_name)[[index_name]])) stop(private$err_field_unknown(index_name, column))
+            if(!is.numeric(max_size)) stop(private$err_param_type_numeric("max_size"))
+            if(max_size < 0) stop(private$err_param_positive("max_size"))
 
-            # TODO
-            # need to be changed to composite aggr.
-            # https://www.elastic.co/guide/en/elasticsearch/reference/6.8/search-aggregations-bucket-composite-aggregation.html
+            get_body <- function(field){
+                paste0('{', 
+                    '"size": 0,',
+                    '"aggs":{',
+                        '"kaggs":{',
+                            '"composite":{',
+                                '"size": ', max_size, ',',
+                                '"sources":[{',
+                                    '"kaggs":{',
+                                        '"terms":{',
+                                            '"field": "', field, '"',
+                                        '}',
+                                    '}',
+                                '}]',
+                            '}',
+                        '}',
+                    '}',
+                '}')
+            }
 
-            # request
-            req <- function(target_field){
-                body = list(
-                    "size" = 0,
-                    "aggs" = list(
-                        "kaggs" = list(
-                            "terms" = list(
-                                "field" = target_field
-                            )
-                        )
+            if(self$verbose) message(" -> Maximum size asked: ", max_size)
+
+
+            buckets <- tryCatch(
+                expr = {
+                    if(self$verbose) message(" -> Looking for '", column, "' column keys... ", appendLF = FALSE)
+                    r <- elastic::Search(
+                        self$connection, 
+                        index = index_name, 
+                        size = 0, 
+                        body = get_body(column)
                     )
-                )
-                r <- elastic::Search(self$connection, 
-                                    index_name = index_name, 
+                    if(self$verbose) message("ok")
+                    r
+                },
+                error = function(e){ 
+                    if(self$verbose) message("nok")
+                    if(e$message == "400 - all shards failed"){
+                        tryCatch(
+                            expr = {
+                                new_col <- paste0(column, ".keyword")
+                                if(self$verbose) message(" -> Looking for '", new_col, "' column keys... ", appendLF = FALSE)
+                                r <- elastic::Search(
+                                    self$connection, 
+                                    index = index_name, 
                                     size = 0, 
-                                    body = body)
-                r$aggregations$kaggs$buckets %>% 
-                    lapply(function(x){ x$key }) %>% 
-                    unlist()
-            }
-            # test with keyword field (string field)
-            if(self$verbose) message(" -> Looking for '", column, ".keyword' column keys")
-            res <- column %>% paste0(".keyword") %>% req()
-            # test if null, might try without keyword
-            if(purrr::is_null(res)){
-                if(self$verbose) message(" -> Looking for '", column, "' column keys")
-                res <- column %>% req()
-            }
+                                    body = get_body(new_col)
+                                )
+                                if(self$verbose) message("ok")
+                                r
+                            }, error = function(ee){
+                                stop("Elasticsearch - ", ee)
+                            }
+                        )
+                    } else {
+                        stop("Elasticsearch - ", e)
+                    }
+                }
+            )
+
+            res <- buckets$aggregations$kaggs$buckets %>% 
+                lapply(function(x){ x$key }) %>% 
+                unlist(use.names = FALSE)
+
             if(self$quiet_results) invisible(res) else res
-        },
-
-
-        #' @details
-        #' Get distinct keys elements of a specific field/column.
-        #' Actually a synonym of `$keys()`.
-        #'
-        #' @family data-manipulation
-        #'
-        #' @examples
-        #' kc$distinct("sw", "name")
-        #' kc$distinct("sw", "eye_color")
-        #'
-        #' @param index_name an index name (default: NULL).
-        #' @param columns a field name of this index (default: NULL).
-        #'
-        #' @return a vector of distinct keys from this field/column
-        #'
-        # TODO test
-        distinct = function(index_name = NULL, columns = NULL){
-            self$keys(index_name = index_name, 
-                    columns = columns)
         },
 
 
@@ -1933,7 +1933,7 @@ Kibior <- R6Class(
         #' @family data-manipulation
         #'
         #' @examples
-        #' 
+        #' datasets::iris %>% kc$soft_cast()
         #'
         #' @param data data to cast.
         #' @param caster the caster closure/function (default: tibble::as_tibble)
@@ -1950,10 +1950,10 @@ Kibior <- R6Class(
             # 
             tryCatch(
                 expr = {
-                    do.call(caster, c(data, caster_args))
+                    do.call(caster, list(x = data, caster_args))
                 }, 
                 error = function(e){
-                    if(warn) warning("Cannot cast, no changes applied")
+                    if(warn) message("Cannot cast, no changes applied")
                     if(self$verbose) message(e, "\n")
                     data
                 }
@@ -1968,7 +1968,9 @@ Kibior <- R6Class(
         #' @family data-manipulation
         #'
         #' @examples
-        #' 
+        #' system.file("R", "kibior.R", package = "kibior") %>% 
+        #'  kc$get_resource()
+        #' "https://ftp.ncbi.nlm.nih.gov/entrez/README" %>% kc$get_resource()
         #'
         #' @param url_or_filepath a filepath or an URL.
         #'

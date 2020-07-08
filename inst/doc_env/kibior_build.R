@@ -55,7 +55,7 @@
     # return
     args
 }
-
+#
 .kibior_get_instance_from_env <- function(){
     ka <- .kibior_get_elastic_var_from_env()
     kc <- do.call(Kibior$new, ka)

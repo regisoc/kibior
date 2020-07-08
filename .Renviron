@@ -1,7 +1,6 @@
 # needed during build
 # KIBIOR_BUILD_ES_ENDPOINT="locahost"
-#KIBIOR_BUILD_ES_ENDPOINT="elasticsearch"
-KIBIOR_BUILD_ES_ENDPOINT="elasticsearch2"
+KIBIOR_BUILD_ES_ENDPOINT="elasticsearch"
 KIBIOR_BUILD_ES_PORT=9200
 
 # add credentials if needed
