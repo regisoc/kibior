@@ -22,10 +22,11 @@ r:
   - bioc-devel
 
 env:
-  - ES_VERSION=5.6.16 
-  - ES_VERSION=6.8.8 R_COV=true
+  - ES_VERSION=6.8.9 R_COV=true
   - ES_VERSION=7.5.2 R_COV=true
   - ES_VERSION=7.6.2 R_COV=true
+  - ES_VERSION=7.7.1 R_COV=true
+  - ES_VERSION=7.8.0 R_COV=true
 
 
 ## PROCESS
@@ -36,7 +37,7 @@ services:
 before_install:
   - docker --version
   - docker pull docker.elastic.co/elasticsearch/elasticsearch:$ES_VERSION
-  - CID=$(docker run -d -p 9200:9200 --name "es" -e "discovery.type=single-node" -e "transport.host=127.0.0.1" -e "xpack.security.enabled=false" docker.elastic.co/elasticsearch/elasticsearch:$ES_VERSION)
+  - CID=$(docker run -d -p 9200:9200 --name "elasticsearch" -e "discovery.type=single-node" -e "transport.host=127.0.0.1" -e "xpack.security.enabled=false" docker.elastic.co/elasticsearch/elasticsearch:$ES_VERSION)
 
 # code coverage lib
 # ES has enough times to start
@@ -51,7 +52,6 @@ r_packages:
 before_script:
   - IPADDRESS=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $CID)
   - curl -X GET "$IPADDRESS:9200/_cluster/health?pretty"
-  - 
 
 # script call
 # https://docs.travis-ci.com/user/languages/r/#customizing-the-travis-build-steps
