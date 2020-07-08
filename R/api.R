@@ -1218,6 +1218,7 @@ Kibior <- R6Class(
         #' @return a new instance/object of Kibior
         #'
         #' @examples
+        #' \dontrun{
         #' # default initiatlization, connect to "localhost:9200"
         #' # kc <- Kibior$new()
         #' # connect to "192.168.2.145:9200"
@@ -1228,6 +1229,7 @@ Kibior <- R6Class(
         #' # kc <- Kibior$new(host = "192.168.2.145", port = 9450, user = "foo", pwd = "bar")
         #' # connect to "elasticsearch:9200"
         #' # kc <- Kibior$new("elasticsearch")
+        #' }
         #' 
         #' # get kibior var from ".Renviron" file
         #' dd <- system.file("doc_env", "kibior_build.R", package = "kibior")
