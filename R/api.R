@@ -1418,6 +1418,7 @@ Kibior <- R6Class(
             if(!purrr::is_null(r) && !get_specials){
                 # remove special indices
                 r <- r[!startsWith(r, ".")]
+                r <- r[!startsWith(r, "watcher_")]
             }
             if(self$quiet_results) invisible(r) else r
         },
@@ -1814,7 +1815,7 @@ Kibior <- R6Class(
             if(!(column %in% self$columns(index_name)[[index_name]])) stop(private$err_field_unknown(index_name, column))
             if(!is.numeric(max_size)) stop(private$err_param_type_numeric("max_size"))
             if(max_size < 0) stop(private$err_param_positive("max_size"))
-
+            # 
             get_body <- function(field){
                 paste0('{', 
                     '"size": 0,',
@@ -1834,10 +1835,9 @@ Kibior <- R6Class(
                     '}',
                 '}')
             }
-
+            # warn
             if(self$verbose) message(" -> Maximum size asked: ", max_size)
-
-
+            # get
             buckets <- tryCatch(
                 expr = {
                     if(self$verbose) message(" -> Looking for '", column, "' column keys... ", appendLF = FALSE)
@@ -1874,11 +1874,11 @@ Kibior <- R6Class(
                     }
                 }
             )
-
+            # get columns
             res <- buckets$aggregations$kaggs$buckets %>% 
                 lapply(function(x){ x$key }) %>% 
                 unlist(use.names = FALSE)
-
+            # 
             if(self$quiet_results) invisible(res) else res
         },
 

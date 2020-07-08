@@ -1,8 +1,10 @@
+# explicit travis env var
+R_TRAVIS = ".com"
+
 # needed during build
 # KIBIOR_BUILD_ES_ENDPOINT="locahost"
-KIBIOR_BUILD_ES_ENDPOINT="elasticsearch"
-KIBIOR_BUILD_ES_PORT=9200
+# KIBIOR_BUILD_ES_PORT=9200
 
 # add credentials if needed
-#KIBIOR_BUILD_ES_USERNAME
-#KIBIOR_BUILD_ES_PASSWORD
+# KIBIOR_BUILD_ES_USERNAME
+# KIBIOR_BUILD_ES_PASSWORD

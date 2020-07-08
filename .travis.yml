@@ -12,6 +12,7 @@ git:
 
 ## MATRIX
 
+# force all warning to be errros
 warnings_are_errors: true
 # pandoc: false
 
@@ -50,11 +51,18 @@ r_packages:
 # install call
 
 before_script:
-  - IPADDRESS=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $CID)
-  - curl -X GET "$IPADDRESS:9200/_cluster/health?pretty"
+  # call port=9200 (default) and endpoint based on init ipaddress
+  - KIBIOR_PORT=9200
+  - KIBIOR_IPADDRESS=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $CID)
+  - curl -X GET "$KIBIOR_IPADDRESS:$KIBIOR_PORT/_cluster/health?pretty"
 
 # script call
+# main scripts
 # https://docs.travis-ci.com/user/languages/r/#customizing-the-travis-build-steps
+
+script:
+- KIBIOR_BUILD_ES_ENDPOINT=$KIBIOR_IPADDRESS KIBIOR_BUILD_ES_PORT=$KIBIOR_PORT R CMD build .
+- KIBIOR_BUILD_ES_ENDPOINT=$KIBIOR_IPADDRESS KIBIOR_BUILD_ES_PORT=$KIBIOR_PORT R CMD check *tar.gz
 
 after_success:
 - if [[ "${R_COV}" ]]; then Rscript -e 'covr::codecov()'; fi
