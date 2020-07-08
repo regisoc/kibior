@@ -6,6 +6,7 @@ citEntry(
     author      = personList(as.person("Régis Ongaro-Carcy")),
     year        = "2020",
     url         = "https://github.com/regisoc/kibior",
+    note        = "WIP.",
 
     textVersion =
     paste(
