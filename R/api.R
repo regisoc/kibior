@@ -1220,15 +1220,15 @@ Kibior <- R6Class(
         #' @examples
         #' \dontrun{
         #' # default initiatlization, connect to "localhost:9200"
-        #' # kc <- Kibior$new()
+        #' kc <- Kibior$new()
         #' # connect to "192.168.2.145:9200"
-        #' # kc <- Kibior$new("192.168.2.145")
+        #' kc <- Kibior$new("192.168.2.145")
         #' # connect to "es:15005", verbose mode activated
-        #' # kc <- Kibior$new(host = "elasticsearch", port = 15005, verbose = TRUE)
+        #' kc <- Kibior$new(host = "elasticsearch", port = 15005, verbose = TRUE)
         #' # connect to "192.168.2.145:9450" with credentials "foo:bar"
-        #' # kc <- Kibior$new(host = "192.168.2.145", port = 9450, user = "foo", pwd = "bar")
+        #' kc <- Kibior$new(host = "192.168.2.145", port = 9450, user = "foo", pwd = "bar")
         #' # connect to "elasticsearch:9200"
-        #' # kc <- Kibior$new("elasticsearch")
+        #' kc <- Kibior$new("elasticsearch")
         #' }
         #' 
         #' # get kibior var from ".Renviron" file
@@ -1455,7 +1455,7 @@ Kibior <- R6Class(
         #'
         #' @family crud-index
         #'
-        #' @param index_name a vector of index names to delete (default: NULL).
+        #' @param index_name a vector of index names to delete.
         #'
         #' @return a list containing results of deletion per index
         #'
@@ -1463,7 +1463,7 @@ Kibior <- R6Class(
         #' kc$delete("aaa")
         #' kc$delete(c("bbb", "ccc"))
         #' 
-        delete = function(index_name = NULL){
+        delete = function(index_name){
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
             if("_all" %in% index_name) stop("Cannot delete all indices at once.")
             if("*" %in% index_name) stop("Cannot delete all indices at once.")
@@ -1471,21 +1471,23 @@ Kibior <- R6Class(
             res <- list()
             complete <- list()
             for(i in index_name){
-                if(self$verbose) message("Deleting index '", i, "'")
+                if(self$verbose) message(" -> Deleting index '", i, "'... ", appendLF = FALSE)
                 # delete
                 complete[[i]] <- tryCatch(
                     expr = {
-                        elastic::index_delete(self$connection, index = i, verbose = FALSE)
+                        r <- elastic::index_delete(self$connection, index = i, verbose = FALSE)
+                        if(self$verbose) message("ok")
+                        r
                     },
                     error = function(e){
+                        if(self$verbose) message("nok")
                         if(grepl("no such index", e$message, ignore.case = TRUE)){
-                            if(self$verbose){
-                                message("Index '", i, "' does not exists")
-                            }
-                            list(acknowledged = FALSE)
+                            if(self$verbose) message(" -> Index '", i, "' does not exists")
+                            r <- list(acknowledged = FALSE)
                         } else {
                             stop(e$message)
                         }
+                        r
                     }
                 )
                 # 
@@ -2596,7 +2598,7 @@ Kibior <- R6Class(
                         message(" -> Adapting NULL/NA to empty strings values from columns: ", .)
                 }
                 data <- data %>% 
-                    dplyr::mutate_at(vars(list_col_names), tidyr::replace_na, "") %>% 
+                    dplyr::mutate_at(dplyr::vars(list_col_names), tidyr::replace_na, "") %>% 
                     tibble::as_tibble()
             }
             # -----------------------------------------
@@ -2897,6 +2899,51 @@ Kibior <- R6Class(
         # methods - Search
         # --------------------------------------------------------------------------
 
+        #' @details
+        #' Match requested index names against Elasticsearch indices list.
+        #'
+        #' @family search
+        #'
+        #' @examples
+        #' # search "sw" index name
+        #' kc$match("sw")
+        #' # search all starting with an "s"
+        #' kc$match("s*")
+        #' # get all index name, identical to `$list()`
+        #' kc$match("*")
+        #' # search multiple names 
+        #' kc$match(c("sw", "sw_new", "nope"))
+        #' # search multiple names with pattern
+        #' kc$match(c("s*", "nope"))
+        #'
+        #' @param index_name the index name to use in Elasticsearch, can be a pattern with '*'.
+        #'
+        #' @return a vector of matching index names, NULL if nothing matches.
+        #'
+        match = function(index_name){
+            if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
+            # first requests can be long, warn user
+            if(self$verbose){
+                index_name %>% 
+                    private$vector_to_str() %>% 
+                    message(" -> Requesting index names: ", .)
+            }
+            # get indices
+            res <- elastic::search_shards(
+                    conn = self$connection,
+                    index = index_name
+                )[["indices"]] %>% names()
+            # 
+            if(typeof(res) != "character") stop(private$ERR_WTF, " expected string")
+            if(length(res) == 0) res <- NULL
+            # 
+            if(self$verbose){
+                to_msg <- if(purrr::is_null(res)) "none" else private$vector_to_str(res)
+                message(" -> Matching index names: ", to_msg)
+            }
+            # 
+            res
+        },
 
         #' @details
         #' Search data from Elasticsearch.
