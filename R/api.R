@@ -507,7 +507,7 @@ Kibior <- R6Class(
             "@param data a dataset"
             "@return the mapping of the dataset"
 
-            if(!purrr::is_list(data)) stop("Need a dataset type: `tibble`, `data.frame` or `list`.")
+            if(!purrr::is_list(data)) stop("Need `data.frame` or derivative data structure")
             if(purrr::is_null(data) || length(data) == 0) stop(private$err_empty_data("data"))
             # types
             text_type <- list(
@@ -571,19 +571,21 @@ Kibior <- R6Class(
             if(length(index_name) > 1) stop(private$err_one_value("index_name"))
             if(purrr::is_null(data) || length(data) == 0) stop(private$err_empty_data("data"))
             #
-            if(self$verbose) message(" -> Applying mapping to '", index_name, "'")
+            if(self$verbose) message(" -> Defining mapping")
             mapping <- private$define_mappings(data)
             # req
-            if(self$verbose) message("   - Trying without type insertion (ES > v7)... ", appendLF = FALSE)
+            if(self$verbose) message(" -> Applying mapping to '", index_name, "'")
             res <- tryCatch(
                 expr = {
+                    if(self$verbose) message("   - Trying without type insertion (ES > v7)... ", appendLF = FALSE)
                     # do not insert mapping type
-                    elastic::mapping_create(
+                    r <- elastic::mapping_create(
                         conn = self$connection,
                         index = index_name,
                         body = mapping
                     )
                     if(self$verbose) message("ok")
+                    r
                 },
                 error = function(e){
                     res <- NULL
@@ -1457,7 +1459,7 @@ Kibior <- R6Class(
         #'
         #' @param index_name a vector of index names to delete.
         #'
-        #' @return a list containing results of deletion per index
+        #' @return a list containing results of deletion per index, or NULL if no index name match
         #'
         #' @examples
         #' kc$delete("aaa")
@@ -1467,42 +1469,53 @@ Kibior <- R6Class(
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
             if("_all" %in% index_name) stop("Cannot delete all indices at once.")
             if("*" %in% index_name) stop("Cannot delete all indices at once.")
-            #
-            res <- list()
-            complete <- list()
-            for(i in index_name){
-                if(self$verbose) message(" -> Deleting index '", i, "'... ", appendLF = FALSE)
-                # delete
-                complete[[i]] <- tryCatch(
-                    expr = {
-                        r <- elastic::index_delete(self$connection, index = i, verbose = FALSE)
-                        if(self$verbose) message("ok")
-                        r
-                    },
-                    error = function(e){
-                        if(self$verbose) message("nok")
-                        if(grepl("no such index", e$message, ignore.case = TRUE)){
-                            if(self$verbose) message(" -> Index '", i, "' does not exists")
-                            r <- list(acknowledged = FALSE)
-                        } else {
-                            stop(e$message)
+            # match index names
+            indices <- self$match(index_name)
+            if(purrr::is_null(indices)){
+                if(self$verbose) message(" -> Deleting no index... well, ok")
+                res <- NULL
+            } else {
+                #
+                res <- list()
+                complete <- list()
+                if(self$verbose) message(" -> Deleting")
+                for(i in indices){
+                    # if(self$verbose) message(" -> Deleting index '", i, "'... ", appendLF = FALSE)
+                    if(self$verbose) message("   - Index '", i, "'... ", appendLF = FALSE)
+                    
+                    # delete
+                    complete[[i]] <- tryCatch(
+                        expr = {
+                            r <- elastic::index_delete(self$connection, index = i, verbose = FALSE)
+                            if(self$verbose) message("ok")
+                            r
+                        },
+                        error = function(e){
+                            if(self$verbose) message("nok")
+                            if(grepl("no such index", e$message, ignore.case = TRUE)){
+                                if(self$verbose) message(" -> Index '", i, "' does not exists")
+                                r <- list(acknowledged = FALSE)
+                            } else {
+                                stop(e$message)
+                            }
+                            r
                         }
-                        r
+                    )
+                    # 
+                    if(complete[[i]]$acknowledged){
+                        private$force_merge()
+                        private$optimize(i)
+                        res[[i]] <- TRUE
+                    } else {
+                        res[[i]] <- FALSE
                     }
-                )
-                # 
-                if(complete[[i]]$acknowledged){
-                    private$force_merge()
-                    private$optimize(i)
-                    res[[i]] <- TRUE
-                } else {
-                    res[[i]] <- FALSE
+                }
+                # wait if at least one deleted
+                if(any(unlist(res, use.names = FALSE))){
+                    Sys.sleep(self$elastic_wait)
                 }
             }
-            # wait if at least one deleted
-            if(any(unlist(res, use.names = FALSE))){
-                Sys.sleep(self$elastic_wait)
-            }
+            #
             if(self$quiet_results) invisible(res) else res
         },
 
@@ -3032,28 +3045,6 @@ Kibior <- R6Class(
             # init
             selected_fields <- if(purrr::is_null(columns)) NULL else paste0(columns, collapse = ",")
             end_search <- FALSE
-            # get involved indices in search
-            get_involved_indices <- function(req_indices){
-                # first requests can be long, warn user
-                if(self$verbose) message(" -> Waiting for Elasticsearch to parse requests...")
-                # useless if all indices are named
-                if(!private$is_search_pattern(req_indices)){
-                    index_names_list <- req_indices
-                } else {
-                    # get indices
-                    index_names_list <- elastic::search_shards(
-                            conn = self$connection,
-                            index = req_indices
-                        ) %>% 
-                        .[["indices"]] %>% 
-                        names()
-                }
-                res <- list()
-                for(i in index_names_list){
-                    res[[i]] <- list()
-                }
-                res
-            }
             # total according to ES version
             get_total_records <- function(hits_total){
                 if(self$version$major > 6) hits_total$value else hits_total
@@ -3110,15 +3101,10 @@ Kibior <- R6Class(
                     unlist(use.names = FALSE)
             }
             # involved_indices
-            final_df <- get_involved_indices(index_name)
-            if(self$verbose){
-                message(" -> Requesting indices: ", index_name)
-                # 
-                final_df %>% 
-                    names() %>% 
-                    paste0(collapse = ", ") %>% 
-                    message(" -> Matching indices: ", .)
-            }
+            involved_indices <- self$match(index_name)
+            final_df <- involved_indices %>% 
+                lapply(function(x){ list() }) %>% 
+                setNames(involved_indices)
             # various infos per index
             run_infos <- final_df
             for(i in names(run_infos)){
