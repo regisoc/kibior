@@ -12,9 +12,6 @@
 
 # run before tests
 
-library(magrittr)
-library(dplyr)
-
 message()
 message("----------------------------------")
 message("-- GLOBAL DEFINITION")
@@ -61,9 +58,9 @@ ds <- list(
     # small, 87 records
     "starwars" = dplyr::starwars %>% change_names() %>% mutate_factors(),
     # medium, 10k records
-    "storms" = dplyr::storms %>% change_names() %>% mutate_factors(),
-    # large, 53k records
-    "diamonds" = ggplot2::diamonds %>% change_names() %>% mutate_factors()
+    "storms" = dplyr::storms %>% change_names() %>% mutate_factors()
+    # # large, 53k records
+    # "diamonds" = ggplot2::diamonds %>% change_names() %>% mutate_factors()
 )
 
 
@@ -89,15 +86,15 @@ st["category"] <- 18
 
 # diamonds
 ## 74 records modified to a new color that does not exist
-d <- ggplot2::diamonds %>% 
-    filter(clarity == "VS1" & depth > 65)
-d["color"] <- "W"
+# d <- ggplot2::diamonds %>% 
+#     filter(clarity == "VS1" & depth > 65)
+# d["color"] <- "W"
 
 # only the updated records here, not all
 ds_modified <- list(
     "starwars" = change_names(s),
-    "storms" = change_names(st),
-    "diamonds" = change_names(d)
+    "storms" = change_names(st)
+    # "diamonds" = change_names(d)
 )
 
 
@@ -160,7 +157,7 @@ dept <- list(
 ) %>% dplyr::as_tibble()
 
 # dplyr by
-join_fields <- c("dept_name" = "name")
+join_cols <- c("dept_name" = "name")
 
 # use with quosure "!!"
 query_local <- dplyr::quo(dept_name %in% c("Finance", "Sales"))
@@ -175,8 +172,10 @@ query_remote <- "dept_name:(finance || sales)"
 
 
 remove_all_indices <- function(){
-    res <- kc$list()
-    if(!purrr::is_null(res)) kc$delete(res)
+    tryCatch(
+        expr = { kc$delete(kc$list()) },
+        error = function(e){  }
+    )
 }
 
 
