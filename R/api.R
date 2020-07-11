@@ -120,6 +120,9 @@ Kibior <- R6Class(
         # constants
         # --------------------------------------------------------------------------
 
+        # Private .MAX_BUCKET_SIZE Threshold for returning data from ES
+        .MAX_BUCKET_SIZE = 10000L,
+
         # Private .VALID_JOINS List of valid joins, used to test
         .VALID_JOINS = c("inner", "full", "left", "right", "semi", "anti"),
 
@@ -131,9 +134,6 @@ Kibior <- R6Class(
 
         # Private .VALID_PUSH_MODES List of valid push data modes, used to test
         .VALID_PUSH_MODES = c("check", "recreate", "update"),
-
-        # Private .VALID_IMPORT_MODES List of valid import mode
-        .VALID_IMPORT_MODES = c("local", "remote", "both"),
 
         # Private .RESERVED_QUERY_STRING_CHAR reserved characters for query string syntax
         .RESERVED_QUERY_STRING_CHAR = stringr::str_split("+ - = && || > < ! ( ) { } [ ] ^ \" ~ * ? : \\ /", " ")[[1]],
@@ -483,7 +483,7 @@ Kibior <- R6Class(
         },
 
 
-        metadata_type = function(metadata_type = NULL, index_name = NULL){
+        metadata_type = function(metadata_type, index_name){
             if(!purrr::is_character(metadata_type)) stop(private$err_param_type_character("metadata_type"))
             if(length(metadata_type) > 1) stop(private$err_one_value("metadata_type"))
             if(!is.null(index_name) && !purrr::is_character(index_name)) stop(private$err_param_type_character("index_name", can_be_null = TRUE))
@@ -555,7 +555,7 @@ Kibior <- R6Class(
         },
 
 
-        create_mappings = function(index_name = NULL, data = NULL){
+        create_mappings = function(index_name, data){
             "Add a mapping on an index based on given data."
             ""
             "@examples"
@@ -563,8 +563,8 @@ Kibior <- R6Class(
             "kc$create('aaa')"
             "kc$create_mapping('aaa', starwars)"
             ""
-            "@param index_name a vector of index names (default: NULL)."
-            "@param data a dataset (default: NULL)."
+            "@param index_name a vector of index names."
+            "@param data a dataset."
             "@return a list of indices, each containing their number of observations and variables."
 
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
@@ -617,14 +617,17 @@ Kibior <- R6Class(
                     res
                 }
             )
+            #
+            if(self$verbose) message(" -> Waiting a bit for Elasticsearch")
             Sys.sleep(self$elastic_wait)
             res
         },
 
 
-        force_merge = function(index_name = NULL, max_num_segments = NULL, only_expunge_deletes = FALSE, flush = TRUE){
+        force_merge = function(index_name, max_num_segments = NULL, only_expunge_deletes = FALSE, flush = TRUE){
             "TODO desc"
 
+            if(missing(index_name)) index_name <- "*"
             elastic::index_forcemerge(self$connection, 
                                       index = index_name, 
                                       max_num_segments = max_num_segments, 
@@ -633,7 +636,7 @@ Kibior <- R6Class(
         },
 
 
-        optimize = function(index_name = NULL, max_num_segments = NULL, only_expunge_deletes = FALSE, flush = TRUE, wait_for_merge = TRUE){
+        optimize = function(index_name, max_num_segments = NULL, only_expunge_deletes = FALSE, flush = TRUE, wait_for_merge = TRUE){
             "TODO desc"
 
             if(self$version$major < 5){
@@ -1092,27 +1095,6 @@ Kibior <- R6Class(
             }
         },
 
-
-        #' @field valid_import_modes Access the valid import modes available.
-        valid_import_modes = function(value){
-            "Access the valid import modes available."
-            ""
-            "@examples"
-            "kc <- Kibior()"
-            "kc$valid_import_modes"
-            "kc$valid_import_modes <- 'whatever' # Error, read only"
-            ""
-            "@param value not used"
-            "@return A vector representing possible valid import modes"
-
-            if(missing(value)) {
-                private$.VALID_IMPORT_MODES
-            } else {
-                stop(private$err_active_is_read_only("$valid_import_modes"), call. = FALSE)
-            }
-        },
-
-
         #' @field shard_number Access and modify the number of allocated primary shards when 
         #'  creating an Elasticsearch index.
         shard_number = function(value){
@@ -1355,7 +1337,7 @@ Kibior <- R6Class(
         #' kc$create("aaa")
         #' kc$create(c("bbb", "ccc"))
         #' 
-        create = function(index_name = NULL, force = FALSE){
+        create = function(index_name, force = FALSE){
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
             if(private$is_search_pattern(index_name)) stop(private$err_search_pattern_forbidden("index_name"))
             if(!purrr::is_logical(force)) stop(private$err_param_type_logical("force"))
@@ -1364,8 +1346,9 @@ Kibior <- R6Class(
             res <- list()
             complete <- list()
             f <- if(force) elastic::index_recreate else elastic::index_create
+            fnote <- if(force) "Recreating" else "Creating"
             for(i in index_name){
-                if(self$verbose) message(" -> Creating index '", i, "'")
+                if(self$verbose) message(" -> ", fnote, " index '", i, "'")
                 # build with settings but mapping is defined with data to better match fields type
                 body <- list(
                     "settings" = list(
@@ -1390,7 +1373,7 @@ Kibior <- R6Class(
                 )
                 # control
                 if(complete[[i]]$acknowledged){
-                    private$force_merge()
+                    private$force_merge("*")
                     private$optimize(i)
                     res[[i]] <- TRUE
                 } else {
@@ -1399,6 +1382,7 @@ Kibior <- R6Class(
             }
             # wait if at least one created
             if(any(unlist(res, use.names = FALSE))){
+                if(self$verbose) message(" -> Waiting a bit for Elasticsearch")
                 Sys.sleep(self$elastic_wait)
             }
             if(self$quiet_results) invisible(res) else res
@@ -1436,11 +1420,11 @@ Kibior <- R6Class(
         #' kc$has("aaa")
         #' c("bbb", "ccc") %>% kc$has()
         #'
-        #' @param index_name a vector of index names to check (default: NULL).
+        #' @param index_name a vector of index names to check.
         #'
         #' @return a list with TRUE for found index, else FALSE
         #'
-        has = function(index_name = NULL){
+        has = function(index_name){
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
             if(private$is_search_pattern(index_name)) stop(private$err_search_pattern_forbidden("index_name"))
             # result
@@ -1503,7 +1487,7 @@ Kibior <- R6Class(
                     )
                     # 
                     if(complete[[i]]$acknowledged){
-                        private$force_merge()
+                        private$force_merge("*")
                         private$optimize(i)
                         res[[i]] <- TRUE
                     } else {
@@ -1512,6 +1496,7 @@ Kibior <- R6Class(
                 }
                 # wait if at least one deleted
                 if(any(unlist(res, use.names = FALSE))){
+                    if(self$verbose) message(" -> Waiting a bit for Elasticsearch")
                     Sys.sleep(self$elastic_wait)
                 }
             }
@@ -1581,8 +1566,8 @@ Kibior <- R6Class(
         #'
         #' @return the list of indices, each containing the 3 features (mappings,settings, aliases) 
         #'
-        metadata = function(index_name = NULL){
-            if(purrr::is_null(index_name)) index_name <- "_all"
+        metadata = function(index_name){
+            if(missing(index_name) || purrr::is_null(index_name)) index_name <- "_all"
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name", can_be_null = TRUE))
             res <- NULL
             m <- suppressWarnings({
@@ -1609,13 +1594,13 @@ Kibior <- R6Class(
         #' kc$mappings("sw")
         #' kc$mappings(c("sw", "sw_naboo"))
         #'
-        #' @param index_name a vector of index names to get mappings (default: NULL).
+        #' @param index_name a vector of index names to get mappings.
         #'
         #' @return the list of indices, containing their mapping
         #'
-        mappings = function(index_name = NULL){
-            res <- private$metadata_type(metadata_type = "mappings", 
-                                        index_name = index_name)
+        mappings = function(index_name){
+            if(missing(index_name)) index_name <- NULL
+            res <- private$metadata_type("mappings", index_name)
             if(!purrr::is_null(res)){
                 # remove type call
                 if(self$version$major < 7){
@@ -1637,13 +1622,13 @@ Kibior <- R6Class(
         #' kc$settings("sw")
         #' kc$settings(c("sw", "sw_tatooine"))
         #'
-        #' @param index_name a vector of index names to get settings (default: NULL).
+        #' @param index_name a vector of index names to get settings.
         #'
         #' @return the list of indices, containing their settings
         #'
-        settings = function(index_name = NULL){
-            res <- private$metadata_type(metadata_type = "settings", 
-                                            index_name = index_name)
+        settings = function(index_name){
+            if(missing(index_name)) index_name <- NULL
+            res <- private$metadata_type("settings", index_name)
             if(self$quiet_results) invisible(res) else res
         },
 
@@ -1657,13 +1642,13 @@ Kibior <- R6Class(
         #' kc$aliases("sw")
         #' kc$aliases(c("sw", "sw_alderaan"))
         #'
-        #' @param index_name a vector of index names to get aliases (default: NULL).
+        #' @param index_name a vector of index names to get aliases.
         #'
         #' @return the list of indices, containing their aliases
         #'
-        aliases = function(index_name = NULL){ 
-            res <- private$metadata_type(metadata_type = "aliases", 
-                                        index_name = index_name)
+        aliases = function(index_name){ 
+            if(missing(index_name)) index_name <- NULL
+            res <- private$metadata_type("aliases", index_name)
             if(self$quiet_results) invisible(res) else res
         },
 
@@ -1680,39 +1665,38 @@ Kibior <- R6Class(
         #' # Number of variables (nb of columns) in index "sw_naboo"
         #' kc$count("sw_naboo", type = "variables")
         #'
-        #' @param index_name a vector of index names to get aliases (default: NULL).
-        #' @param type a string representing the type to count: "observations" or "variables" 
-        #'  (default: "observations").
+        #' @param index_name a vector of index names to get aliases.
+        #' @param type a string representing the type to count: "observations" (lines) or 
+        #'  "variables" (columns) (default: "observations").
         #' @param query a string as a query string syntax (default: NULL).
         #'
         #' @return the list of indices, containing their number of observations or variables. 
         #'  Use `$dim()` for both
         #'
-        count = function(index_name = NULL, type = "observations", query = NULL){
+        count = function(index_name, type = "observations", query = NULL){
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
-            has_indices <- self$has(index_name)
-            absent_indices <- names(has_indices[has_indices == FALSE])
-            if(length(absent_indices) != 0){
-                stop(private$err_index_unknown(absent_indices))
-            }
             if(length(type) > 1) stop(private$err_one_value("type"))
             if(!(type %in% private$.VALID_COUNT_TYPES)) stop(private$err_not_in_vector("Count type", private$.VALID_COUNT_TYPES))
             if(!purrr::is_null(query)){
                 if(!purrr::is_character(query)) stop(private$err_param_type_character("query"))
                 if(length(query) > 1) stop(private$err_one_value("query"))
             }
+            #
+            involved_indices <- self$match(index_name)
             # 
             res <- list()
-            for(i in index_name){
-                res[[i]] <- switch(type,
-                    "observations" = {
-                        elastic::count(self$connection, index = i, q = query)
-                    },
-                    "variables" = {
-                        self$columns(i)[[i]] %>% length()
-                    },
-                    stop(private$ERR_WTF, " Found type: ", type)
-                )
+            if(!purrr::is_null(involved_indices)){
+                for(i in involved_indices){
+                    res[[i]] <- switch(type,
+                        "observations" = {
+                            elastic::count(self$connection, index = i, q = query)
+                        },
+                        "variables" = {
+                            suppressMessages(self$columns(i)[[i]]) %>% length()
+                        },
+                        stop(private$ERR_WTF, " Found type: ", type)
+                    )
+                }
             }
             if(length(res) == 0){
                 res <- NULL
@@ -1731,28 +1715,26 @@ Kibior <- R6Class(
         #' # Couple [<nb obs> <nb var>] in indices "sw_naboo" and "sw_alderaan"
         #' kc$dim(c("sw_naboo", "sw_alderaan"))
         #'
-        #' @param index_name a vector of index names to get aliases (default: NULL).
+        #' @param index_name a vector of index names to get aliases.
         #'
         #' @return the list of indices, containing their number of observations and variables.
         #'
-        dim = function(index_name = NULL){
+        dim = function(index_name){
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
-            has_indices <- self$has(index_name)
-            absent_indices <- names(has_indices[has_indices == FALSE])
-            if(length(absent_indices) != 0){
-                stop(private$err_index_unknown(absent_indices))
-            }
-            #
-            p <- as.list(index_name)
-            names(p) <- index_name
             # 
-            res <- p %>% 
-                purrr::imap(function(x, y){ 
+            involved_indices <- self$match(index_name)
+            #
+            res <- involved_indices %>%
+                lapply(function(x){ 
                     c(
-                        self$count(x, type = "observations")[[x]], 
-                        self$count(x, type = "variables")[[x]]
+                        suppressMessages(self$count(x, type = "observations")[[x]]),
+                        suppressMessages(self$count(x, type = "variables")[[x]])
                     )
-                })
+                }) %>% 
+                setNames(involved_indices)
+            #
+            if(length(res) == 0) res <- NULL
+            # 
             if(self$quiet_results) invisible(res) else res
         },
 
@@ -1765,38 +1747,35 @@ Kibior <- R6Class(
         #' kc$columns("sw")          # direct search
         #' kc$columns("sw_*")        # pattern search
         #'
-        #' @param index_name a vector of index names, can be a pattern (default: NULL).
+        #' @param index_name a vector of index names, can be a pattern.
         #'
         #' @return a list of indices, each containing their fields/columns.
         #'
         # TODO test
-        columns = function(index_name = NULL){
+        columns = function(index_name){
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
-            if(!private$is_search_pattern(index_name)){
-                has_indices <- self$has(index_name)
-                absent_indices <- names(has_indices[has_indices == FALSE])
-                if(length(absent_indices) != 0){
-                    stop(private$err_index_unknown(absent_indices))
+            # 
+            involved_indices <- self$match(index_name)
+            #
+            res <- NULL
+            if(!purrr::is_null(involved_indices)){
+                selected_mapping <- self$mappings(index_name)
+                # 
+                get_property_names <- function(index_name){
+                    # try index name
+                    r <- selected_mapping[[index_name]]$properties
+                    # if main selected_mapping is empty, maybe in "_doc"
+                    if(purrr::is_null(r)){ 
+                        r <- selected_mapping[["_doc"]]$properties
+                    }
+                    names(r)
                 }
+                # 
+                res <- involved_indices %>% 
+                    lapply(get_property_names) %>% 
+                    setNames(involved_indices)
             }
             #
-            res <- list()
-            tmp <- self$mappings(index_name = index_name)
-            get_property_names <- function(node, index_name){
-                # try index name
-                r <- node[[index_name]]$properties %>% names()
-                # if main node is empty, maybe in "_doc"
-                if(purrr::is_null(r)){ 
-                    r <- node[["_doc"]]$properties %>% names()
-                }
-                r
-            }
-            for(i in names(tmp)){
-                res[[i]] <- get_property_names(tmp, i)
-            }
-            if(length(res) == 0){
-                res <- NULL
-            }
             if(self$quiet_results) invisible(res) else res
         },
 
@@ -1816,14 +1795,14 @@ Kibior <- R6Class(
         #' kc$keys("sw", "name")
         #' kc$keys("sw", "eye_color")
         #'
-        #' @param index_name an index name (default: NULL).
+        #' @param index_name an index name.
         #' @param column a field name of this index (default: NULL).
         #' @param max_size the maximum result to return (default: 1000).
         #'
         #' @return a vector of keys values from this field/column
         #'
         # TODO test
-        keys = function(index_name = NULL, column = NULL, max_size = 1000){
+        keys = function(index_name, column, max_size = 1000){
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
             if(length(index_name) > 1) stop(private$err_one_value("index_name"))
             if(private$is_search_pattern(index_name)) stop(private$err_search_pattern_forbidden("index_name"))
@@ -2362,15 +2341,13 @@ Kibior <- R6Class(
         #' # import 
         #' kc$import(filepath = f_aa)
         #' # import to Elasticsearch index ("sw_from_file") if not exists
-        #' kc$import(filepath = f_bai, import_mode = "remote", push_index = "sw_from_file")
+        #' kc$import(filepath = f_bai, push_index = "sw_from_file")
         #' # import to index by recreating it, then pull indexed data
-        #' kc$import(filepath = f_gff, import_mode = "remote", push_index = "sw_from_file",
+        #' kc$import(filepath = f_gff, push_index = "sw_from_file",
         #'  push_mode = "recreate")
         #'
         #' @param filepath the filepath to use as import, must contain the file extention.
         #' @param import_type can be one of "auto", "tabular", "features", "alignments", "sequences" (default: "auto").
-        #' @param import_mode can be "local" to get file data, "remote" to immediatly push them to 
-        #'  Elasticsearch, "both" to push and pull. (default: "local").
         #' @param push_index the name of the index where to push data (default: NULL).
         #' @param push_mode the push mode (default: "check").
         #' @param id_col the column name of unique IDs (default: NULL).
@@ -2378,12 +2355,9 @@ Kibior <- R6Class(
         #'
         #' @return data contained in the file, or NULL.
         #'
-        import = function(filepath, import_type = "auto", import_mode = "local", push_index = NULL, push_mode = "check", id_col = NULL, to_tibble = TRUE){
+        import = function(filepath, import_type = "auto", push_index = NULL, push_mode = "check", id_col = NULL, to_tibble = TRUE){
             if(!purrr::is_character(filepath)) stop(private$err_param_type_character("filepath"))
             if(length(filepath) > 1) stop(private$err_one_value("filepath"))
-            if(!(import_mode %in% private$.VALID_IMPORT_MODES)) stop(private$err_not_in_vector("import_mode", private$.VALID_IMPORT_MODES))
-            if(!purrr::is_character(import_mode)) stop(private$err_param_type_character("import_mode"))
-            if(length(import_mode) > 1) stop(private$err_one_value("import_mode"))
             if(!purrr::is_null(push_index) && !purrr::is_character(push_index)) stop(private$err_param_type_character("push_index", can_be_null = TRUE))
             if(!(push_mode %in% private$.VALID_PUSH_MODES)) stop(private$err_not_in_vector("push_mode", private$.VALID_PUSH_MODES))
             if(!purrr::is_null(id_col)){
@@ -2406,26 +2380,15 @@ Kibior <- R6Class(
             # check/push
             no_data <- { dim(data) == c(0, 0) } %>% all()
             res <- NULL
+            #
             if(no_data) {
-                if(self$verbose) message("No data found.")
+                if(self$verbose) message("No data found in '", filepath, "'")
             } else {
-                # import mode
-                res <- switch(import_mode,
-                    "local" = { 
-                        data %>% tibble::as_tibble()
-                    },
-                    "remote" = {
-                        data %>% 
-                            self$push(push_index, mode = push_mode, id_col = id_col)
-                    },
-                    "both" = {
-                        data %>% 
-                            self$push(push_index, mode = push_mode, id_col = id_col) %>% 
-                            self$pull() %>%
-                            .[[push_index]]
-                    },
-                    stop(private$ERR_WTF)
-                )
+                res <- data %>% tibble::as_tibble()
+                if(!purrr::is_null(push_index)){
+                    res %>% 
+                        self$push(push_index, mode = push_mode, id_col = id_col)
+                }
             }
             if(self$quiet_results) invisible(res) else res
         },
@@ -2451,8 +2414,8 @@ Kibior <- R6Class(
         #' # view result by querying
         #' kc$pull("sw", query = "height:>180", columns = c("name", "gender"))
         #'
-        #' @param data the data to push (default: NULL).
-        #' @param index_name the index name to use in Elasticsearch (default: NULL).
+        #' @param data the data to push.
+        #' @param index_name the index name to use in Elasticsearch.
         #' @param bulk_size the number of record to send to Elasticsearch in a row (default: 1000).
         #' @param mode the push mode, could be "check", "recreate" or "update" (default: "check").
         #' @param id_col an column anme to use as ID, must be composed of unique elements (default: 
@@ -2460,12 +2423,9 @@ Kibior <- R6Class(
         #'
         #' @return the index_name given if the push ended well, else an error.
         #'
-        push = function(data = NULL, index_name = NULL, bulk_size = 1000, mode = "check", id_col = NULL){
-            if(purrr::is_null(data)) stop(private$err_null_forbidden("data"))
+        push = function(data, index_name, bulk_size = 1000, mode = "check", id_col = NULL){
+            if(missing(data) || purrr::is_null(data)) stop(private$err_null_forbidden("data"))
             if(nrow(data) == 0) stop(private$err_null_forbidden("data"))
-            # data names to lowercase
-            names(data) <- tolower(names(data))
-            if(self$verbose) message(" -> Forcing all columns names to lowercase")
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
             if(length(index_name) > 1) stop(private$err_one_value("index_name"))
             if(!is.numeric(bulk_size)) stop(private$err_param_type_numeric("bulk_size"))
@@ -2490,6 +2450,11 @@ Kibior <- R6Class(
             }
             # -----------------------------------------
             # PREPARE DATA 
+
+            # ------------------
+            # data names to lowercase
+            names(data) <- tolower(names(data))
+            if(self$verbose) message(" -> Forcing all columns names to lowercase")
 
             # ------------------
             # handle id_col
@@ -2697,6 +2662,7 @@ Kibior <- R6Class(
 
             }
             # get some time so Elasticsearch can make them available
+            if(self$verbose) message(" -> Waiting a bit for Elasticsearch")
             Sys.sleep(self$elastic_wait)
             if(self$quiet_results) invisible(index_name) else index_name
         },
@@ -2728,7 +2694,7 @@ Kibior <- R6Class(
         #' r <- kc$pull("sw", query = "height:>180 && homeworld:(Tatooine || Naboo)", columns = 
         #'  c("name", "hair_color", "homeworld"))
         #'
-        #' @param index_name the index name to use in Elasticsearch (default: NULL).
+        #' @param index_name the index name to use in Elasticsearch.
         #' @param bulk_size the number of record to send to Elasticsearch in a row (default: 500).
         #' @param max_size the number of record Elasticsearch will send (default: NULL (all data)).
         #' @param scroll_timer the time the scroll API will let the request alive to scroll on the 
@@ -2748,7 +2714,7 @@ Kibior <- R6Class(
         #' @return a list of datasets corresponding to the pull request, else an error. Keys of the 
         #'  list are index names matching the request, value are the associated tibbles
         #'
-        pull = function(index_name = NULL, bulk_size = 500, max_size = NULL, scroll_timer = "3m", keep_metadata = FALSE, columns = NULL, query = NULL) {
+        pull = function(index_name, bulk_size = 500, max_size = NULL, scroll_timer = "3m", keep_metadata = FALSE, columns = NULL, query = NULL) {
             args <- list(
                 index_name = index_name, 
                 keep_metadata = keep_metadata, 
@@ -2795,23 +2761,19 @@ Kibior <- R6Class(
             # select source instance
             source_instance <- if(is_local) self else from_instance
             if(!purrr::is_character(from_index)) stop(private$err_param_type_character("from_index"))
+            if(private$is_search_pattern(from_index)) stop(private$err_search_pattern_forbidden("from_index"))
             if(length(from_index) > 1) stop(private$err_one_value("from_index"))
             if(!purrr::is_character(to_index)) stop(private$err_param_type_character("to_index"))
+            if(private$is_search_pattern(to_index)) stop(private$err_search_pattern_forbidden("to_index"))
             if(length(to_index) > 1) stop(private$err_one_value("to_index"))
             if(!purrr::is_logical(force)) stop(private$err_param_type_logical("force"))
             if(is.na(force)) stop(private$err_logical_na("force"))
             if(is_local && from_index == to_index) stop("Source and destination indices are the same.")
             has_indices <- source_instance$has(from_index)
             absent_indices <- names(has_indices[has_indices == FALSE])
-            if(length(absent_indices) != 0){
-                stop(private$err_index_unknown(absent_indices))
-            }
-            if(!force){
-                has_indices <- self$has(to_index)
-                already_there_indices <- names(has_indices[has_indices == TRUE])
-                if(length(already_there_indices) != 0){
-                    stop(private$err_index_already_exists(already_there_indices))
-                }
+            if(length(absent_indices) != 0) stop(private$err_index_unknown(absent_indices))
+            if(!force && !purrr::is_null(self$match(to_index))){
+                stop(private$err_index_already_exists(already_there_indices))
             }
             if(!purrr::is_logical(copy)) stop(private$err_param_type_logical("copy"))
             if(is.na(copy)) stop(private$err_logical_na("copy"))
@@ -2845,7 +2807,7 @@ Kibior <- R6Class(
             )
             # function to manage ES errors
             handle_error <- function(e){
-                message("Some errors occur during data transfer.")
+                message(" -> Moving: errors during data transfer")
                 invisible(self$delete(to_index))
                 stop(e)
             }
@@ -2864,10 +2826,12 @@ Kibior <- R6Class(
             # msg
             if(self$verbose){
                 t <- {res$took / 1000} %>% private$humanize_time()
-                message("Documents transfered: ", res$total, ", took: ", t$time, t$unit)
+                message(" -> Documents transfered: ", res$total, ", took: ", t$time, t$unit)
             }
+            #
+            if(self$verbose) message(" -> Waiting a bit for Elasticsearch")
             Sys.sleep(self$elastic_wait)
-            if(self$quiet_results) invisible(res) else res
+            if(self$quiet_results) invisible(to_index) else to_index
         },
 
         # TODO test
@@ -3019,6 +2983,10 @@ Kibior <- R6Class(
             if(length(bulk_size) > 1) stop(private$err_one_value("bulk_size"))
             if(bulk_size < 1) stop(private$err_param_positive("bulk_size", can_be_null = FALSE))
             bulk_size <- as.integer(bulk_size)
+            if(bulk_size > private$.MAX_BUCKET_SIZE){
+                bulk_size <- private$.MAX_BUCKET_SIZE
+                if(self$verbose) message(" -> Restricting 'bulk_size' to 10.000")
+            }
             if(self$verbose) message(" -> Using 'bulk_size': ", bulk_size)
             if(!purrr::is_null(max_size)){
                 if(!is.numeric(max_size)) stop(private$err_param_type_numeric("max_size"))
@@ -3278,7 +3246,16 @@ Kibior <- R6Class(
                                 if(length(final_df[[ current_index ]]) == 0){
                                     final_df[[ current_index ]] <- raw
                                 } else {
-                                    final_df[[ current_index ]] <- dplyr::bind_rows(raw, final_df[[ current_index ]])
+                                    final_df[[ current_index ]] <- tryCatch(
+                                        expr = {
+                                            # error raised with listed columns
+                                            dplyr::bind_rows(raw, final_df[[ current_index ]])
+                                        }, error = function(e){
+                                            # better management of listed columns
+                                            rbind(raw, final_df[[ current_index ]])
+                                        }
+                                    )
+                                    
                                 }
                             }
 
