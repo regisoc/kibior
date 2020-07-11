@@ -509,6 +509,21 @@ kc$list()
 kc$columns("storms")
 ```
 
+## `$count()`: Count the number of elements
+
+```{r list-count}
+#> count all lines
+kc$count("storms")
+
+#> count all columns
+kc$count("storms", type = "variables")
+
+#> count all indices lines via a pattern
+kc$count("s*")
+```
+
+As `$search()` and `$pull()`, this method accepts a `query` parameter to count the number of hits in your dataset following a query. See [`Querying`](#querying) in `Advanced usage` section for more information. 
+
 
 ## `$keys()`: List all unique keys of an Elasticsearch index column
 
@@ -586,7 +601,6 @@ kc$import(filepath = storms_memory_tmp)
 #> import data from file and send it to a new 
 #> Elasticsearch index, with default configuration
 kc$import(filepath = storms_memory_tmp, 
-        import_mode = "both", 
         push_index = "storms_file",
         push_mode = "recreate")
 kc$list()
@@ -603,7 +617,7 @@ kc$import(storms_memory_zip)
 Note: `Kibior` is using `rio` package [@ref_rio] that can export much more formats. 
 See [rio documentation](https://github.com/leeper/rio#supported-file-formats) and `rio::install_formats()` function.
 
-The `$import()` method can natively manage sequence, alignement and feature formats (e.g. fasta, bam, gtf, gff, bed, etc.) since it also wraps Bioconductor library methods such as [`rtracklayer::import()`](https://doi.org/doi:10.18129/B9.bioc.rtracklayer) [@ref_rtracklayer], [`Biostrings::read*StringSet()`](https://doi.org/doi:10.18129/B9.bioc.Biostrings) [@ref_biostrings] and [`Rsamtools::scanBam()`](https://doi.org/doi:10.18129/B9.bioc.Rsamtools) [@ref_rsamtools] as optional import packages.
+The `$import()` method can natively manage sequence, alignement and feature formats (e.g. fasta, bam, gtf, gff, bed, etc.) since it also wraps Bioconductor library methods such as [`rtracklayer::import()`](https://doi.org/doi:10.18129/B9.bioc.rtracklayer) [@ref_rtracklayer], [`Biostrings::read*StringSet()`](https://doi.org/doi:10.18129/B9.bioc.Biostrings) [@ref_biostrings] and [`Rsamtools::scanBam()`](https://doi.org/doi:10.18129/B9.bioc.Rsamtools) [@ref_rsamtools].
 
 Dedicated methods are implemented inside `Kibior` (e.g. `$import_features()` and `$import_alignments()`), and the generic `$import()` method tries to open the right format according to file extension. You can also use specific methods if the import cannot be guessed by the general `import()` method: `import_sequences()`, `import_alignments()`, `import_features()`, `import_tabluar()` and `import_json()`.
 
@@ -614,7 +628,7 @@ The `$move()` method rename an index. The `$copy()` method is equivalent to `$mo
 
 ```{r move}
 #> move a existing dataset to another index
-m <- kc$move(from_index = "storms_file", to_index = "storms_file_moved")
+m <- kc$move("storms_file", "storms_file_moved")
 kc$list()
 ```
 
@@ -624,7 +638,7 @@ The `$copy()` method copy an index to another name. It is a wrapper around `$mov
 
 ```{r copy}
 #> copy index
-m <- kc$copy(from_index = "storms_file_moved", to_index = "storms_file")
+m <- kc$copy("storms_file_moved", "storms_file")
 kc$list()
 ```
 
@@ -739,7 +753,6 @@ As objects, *Kibior* instances attributes can be accessed and updated for some.
 | $valid_count_types            | x         | A vector        | the valid count types available (mainly observations = rows, variables = columns)         |
 | $valid_elastic_metadata_types | x         | A vector        | the valid Elasticsearch metadata types available                                          |
 | $valid_push_modes             | x         | A vector        | the valid push modes available                                                            |
-| $valid_import_modes           | x         | A vector        | the valid import modes available                                                          |
 | $shard_number                 |           | 1               | the number of allocated primary shards when creating an Elasticsearch index               |
 | $shard_replicas_number        |           | 1               | the number of allocated replicas in an Elasticsearch index                                |
 | $default_id_col               |           | "kid"           | the ID column name used when sending data to Elasticsearch if not provided by user        |
@@ -842,7 +855,7 @@ You can use the search feature with the eponym method `$search()` but also `$pul
 
 ### Querying notation
 
-To query specific data, *Kibior* `query` parameter of `$pull()` and `$search()` methods requires one string following the [Elasticsearch Query String Syntax](https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html#query-string-syntax).
+To query specific data, *Kibior* `query` parameter of `$count()`, `$pull()`, `$search()` methods requires one string following the [Elasticsearch Query String Syntax](https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html#query-string-syntax).
 
 To sum them up, you can search for:
 
@@ -1152,13 +1165,13 @@ ns <- kc$pull("starwars",
 ns
 ```
 
-## `select()` and `filter()`.
+## Comparison with `dplyr` functions
 
 `dplyr` package offers simple and effective functions called **filter** and **select** to quickly reduce the scope of interest.
 In the same fashion, Kibior uses *Elasticsearch query string syntax* that is very similar to the **dplyr** syntax (see [Querying](#querying) section). 
 Elasticsearch decuple the search possibilities by allowing similar usage on multiple indices, or datasets, on multiple remote servers.
 
-Moreover, using `$search()` or `$pull()`, one can use their analogous features:
+Moreover, using `$count()`, `$search()` or `$pull()`, one can use their analogous features:
 
 - `dplyr::select()` with `columns` parameter,
 - and `dplyr::filter()` with `query` parameter.
@@ -1314,7 +1327,7 @@ If you manage multiple instances, you can compare host:port couple easily with `
 Using only one instance of *Kibior*, you might want to `attach` this instance to the global environment. 
 This will indeed remove the instance call at the beginning of each method call (in our examples: `kc$...`). 
 
-Thought it can be practical in local developments for only one instance, we **strongly discourage that pratice if you entend to share your code**. 
+Though it can be practical in local developments for only one instance, we **strongly discourage that pratice if you entend to share your code**. 
 It can induce wrong behaviors during execution in environments with different configurations or multiple instances.
 
 
@@ -1342,7 +1355,7 @@ kc$inner_join(dplyr::starwars, "starwars_naboo",
             by = c("name", "height", "mass"))
 ```
 
-As yo ucan see, Kibior uses suffixes "left" and "right" on data column.
+As you can see, Kibior uses suffixes "left" and "right" on data column.
 
 
 
@@ -1351,8 +1364,8 @@ As yo ucan see, Kibior uses suffixes "left" and "right" on data column.
 Appart from moving and copying indices from the same cluster of Elasticsearch instances, the `$move()` and `$copy()` methods can do the same with **REMOTE** instances.
 The remote Elasticsearch endpoint has to be declared inside your `elasticsearch.yml` configuration file. 
 
-By adding one line to the `elasticsearch.yml` configuration file, allowing a server whitelist, Elasticsearch servers can talk to ech others.
-By this, they can transfer data across them in a much faster way and secure way.
+By adding one line to the `elasticsearch.yml` configuration file, allowing a server whitelist, Elasticsearch servers can talk to each others.
+By this, they can transfer data across them in a much faster and secure way.
 
 
 ```yml
@@ -1416,6 +1429,8 @@ kc$columns("iris")
 - `$move()` and `$copy()` for remote instances are very sensitive to authentication and security configurations. Some tasks will not be possible due to each organism security measures.
 
 - *Joins are not executed server-side*, which actually means the Elasticsearch data must be downloaded before executing the actual join. Querying and selecting columns with joins parameters `left_columns`, `right_columns`, `left_query` and `right_query` is realtively important to lower data transfer payload and fasten the execution.
+
+- Elasticsearch limits returned results to *10.000 elements per bulk*. If you try to set `bulk_size` > 10000 in parameter, Kibior will downsize it to match the maximum allowed.
 
 
 
