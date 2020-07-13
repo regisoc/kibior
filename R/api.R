@@ -1933,7 +1933,7 @@ Kibior <- R6Class(
         #' @family data-manipulation
         #'
         #' @examples
-        #' datasets::iris %>% kc$soft_cast()
+        #' kc$soft_cast(datasets::iris)
         #'
         #' @param data data to cast.
         #' @param caster the caster closure/function (default: tibble::as_tibble)
@@ -1968,9 +1968,8 @@ Kibior <- R6Class(
         #' @family data-manipulation
         #'
         #' @examples
-        #' system.file("R", "kibior.R", package = "kibior") %>% 
-        #'  kc$get_resource()
-        #' "https://ftp.ncbi.nlm.nih.gov/entrez/README" %>% kc$get_resource()
+        #' kc$get_resource(system.file("R", "kibior.R", package = "kibior"))
+        #' kc$get_resource("https://ftp.ncbi.nlm.nih.gov/entrez/README")
         #'
         #' @param url_or_filepath a filepath or an URL.
         #'
