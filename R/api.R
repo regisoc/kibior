@@ -377,7 +377,7 @@ Kibior <- R6Class(
                 do.call(args = fargs)
         },
 
-        round = function(nb, nb_decimal = 1){
+        round = function(nb, nb_decimal = 1L){
             "Round to a number to a given decimal number"
             ""
             "@param nb the number to round."
@@ -385,10 +385,13 @@ Kibior <- R6Class(
             "@return a rounded number"
             if(!is.numeric(nb)) stop(private$err_param_type_numeric("nb"))
             if(!is.numeric(nb_decimal)) stop(private$err_param_type_numeric("nb_decimal"))
+            if(nb_decimal < 0) stop(private$err_param_positive("nb_decimal"))
+            nb_decimal <- as.integer(nb_decimal)
             #
             round(nb, nb_decimal) %>%
                 format(nsmall = nb_decimal) %>%
-                trimws()
+                trimws() %>% 
+                as.double()
         },
 
         humanize_time = function(time){
@@ -426,7 +429,7 @@ Kibior <- R6Class(
                 }
             }
             # round it 
-            res$time <- private$round(res$time, nb_decimal = 3)
+            res$time <- as.character(private$round(res$time, nb_decimal = 3))
             res
         },
 
