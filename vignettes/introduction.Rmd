@@ -1113,7 +1113,7 @@ You should remove them before pushing them into Elasticsearch.
 If it is not possible or you want to retrieve data from someone else that contains reserved characters, you should try to query with a `keyword` field.
 
 
-## Push details
+## `$push()` details
 
 ### Define a unique IDs column
 
@@ -1362,7 +1362,7 @@ It can induce wrong behaviors during execution in environments with different co
 
 `kibior` integrated `dplyr package` joins: `full`, `left`, `right`, `inner`, `anti`, and `semi` joins.
 
-By using `kibior joins, you can apply these joins to `in-memory datasets` ***AND*** `Elasticsearch-based indices`.
+By using `kibior` joins, you can apply these joins to `in-memory datasets` and `Elasticsearch-based indices`.
 `kibior supports query parameter when joining to accelerate data retrival time but *cannot join on listed columns*.
 
 ```{r joins}
@@ -1451,17 +1451,21 @@ kc$columns("iris")
 
 - Elasticsearch handles each document (each line of a table) with a unique ID: a specific "_id" metadata field. What can be confusing here is that metadata are not on the same level as data in Elasticsearch. To be able to update data more easily by targeting accurately document IDs, we force add a new unique field (default is `kid`) when pushing data to Elasticsearch and define it as the unique "_id" field. If you know one of your column is unique and can be used as an ID column, you can use the `id_col` of the `$push()` method to define this column as main ID.
 
-- The `columns` parameter of the `$search()` and `$pull()` methods does not handle metadata columns.
+- The `columns` parameter does not handle metadata columns.
 
 - Elasticsearch is really great for textual and keyword search, for that the text has to have common delimiters to be cut down to words. Passing a single, billions-long, uninterrupted biomolecular sequence is not a good thing for Elasticsearch and may result in an indexing failure.
 
-- `$move()` and `$copy()` for remote instances are very sensitive to authentication and security configurations. Some tasks will not be possible due to each organism security measures.
+- `$move()` and `$copy()` for remote instances are very sensitive to authentication and security configurations. Some tasks will not be possible due to each organism security measures. Check with your favorite or proper system administrator.
 
 - *Joins are not executed server-side*, which actually means the Elasticsearch data must be downloaded before executing the actual join. Querying and selecting columns with joins parameters `left_columns`, `right_columns`, `left_query` and `right_query` is realtively important to lower data transfer payload and fasten the execution.
 
 - Elasticsearch limits returned results to *10.000 elements per bulk*. If you try to set `bulk_size` > 10000 in parameter, `kibior will downsize it to match the maximum allowed.
 
-- *Kibior applies some modifications on datasets before sending them on Elasticsearch*: turns all dataset names to lowercase, removes all dataset dotted-based names to underscore-based names, adds `kid` column, etc. All these tranformations can affect the behavior of `$*_join()` methods.  
+- The query parameter expressiveness is a powerful string-based mecanism. Users need to understand that *the query parameter sends in one request* a query to an Elasticsearch instance. If the request is generated based on a list of elements such as `c("id1", "id2", "id3", ...) %>% paste0(collapse = " || ") %>% kc$search("*", query = .)`, it can possibly represents a very long string which cannot be entirely passed down to Elasticsearch properly. One way to counter this issue is to split up the element vector into subset and do mulitple calls.
+
+- *Kibior applies some modifications on datasets before sending them on Elasticsearch*: turns all dataset names to lowercase, removes all dataset dotted-based names to underscore-based names, adds `kid` column, etc. All these tranformations can affect the behavior of `$*_join()` methods.
+
+- The `$keys()` method *limits by default the number of unique keys found to 1000* since it aggregate a possible unlimited number of keys which can happen when calling it on integer or floating point values. If you want more, change the `max_size` method parameter.
 
 
 
