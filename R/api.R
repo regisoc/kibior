@@ -1222,7 +1222,13 @@ Kibior <- R6Class(
         #' kc$quiet_progress <- TRUE
         #'
         #' # preparing all examples (do not mind this for this method)
-        #' to_delete <- c(
+        #' delete_if_exists <- function(index_names){
+        #'     tryCatch(
+        #'         expr = { kc$delete(index_names) },
+        #'         error = function(e){  }
+        #'     )
+        #' }
+        #' delete_if_exists(c(
         #'     "aaa", 
         #'     "bbb", 
         #'     "ccc", 
@@ -1232,11 +1238,9 @@ Kibior <- R6Class(
         #'     "sw_tatooine", 
         #'     "sw_alderaan", 
         #'     "sw_from_file", 
-        #'     "storms"
-        #' )
-        #' to_delete[kc$has(to_delete)] %>%
-        #'     names() %>%
-        #'     kc$delete()
+        #'     "storms",
+        #'     "starwars"
+        #' ))
         #'
         initialize = function(host = "localhost", port = 9200, user = NULL, pwd = NULL, verbose = getOption("verbose")){
             if(purrr::is_null(host)) host <- "localhost"
@@ -1418,7 +1422,7 @@ Kibior <- R6Class(
         #'
         #' @examples
         #' kc$has("aaa")
-        #' c("bbb", "ccc") %>% kc$has()
+        #' kc$has(c("bbb", "ccc"))
         #'
         #' @param index_name a vector of index names to check.
         #'
