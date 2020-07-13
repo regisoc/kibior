@@ -100,49 +100,6 @@ test_that("kibior::joins, error when only one index right", {
 
 
 
-## list col
-
-test_that("kibior::joins, listed col error", {
-    for(i in names(ds)){
-        has_list <- ds[[i]] %>% 
-            lapply(typeof) %>% 
-            unlist(use.names = FALSE) %>% 
-            {"list" %in% .}
-        if(has_list){
-            # local
-            expect_error(kc$inner_join(ds[[i]], ds[[i]]))
-            expect_error(kc$left_join(ds[[i]], ds[[i]]))
-            expect_error(kc$right_join(ds[[i]], ds[[i]]))
-            expect_error(kc$full_join(ds[[i]], ds[[i]]))
-            expect_error(kc$semi_join(ds[[i]], ds[[i]]))
-            expect_error(kc$anti_join(ds[[i]], ds[[i]]))
-            # left
-            expect_error(kc$inner_join(i, ds[[i]]))
-            expect_error(kc$left_join(i, ds[[i]]))
-            expect_error(kc$right_join(i, ds[[i]]))
-            expect_error(kc$full_join(i, ds[[i]]))
-            expect_error(kc$semi_join(i, ds[[i]]))
-            expect_error(kc$anti_join(i, ds[[i]]))
-            # right
-            expect_error(kc$inner_join(ds[[i]], i))
-            expect_error(kc$left_join(ds[[i]], i))
-            expect_error(kc$right_join(ds[[i]], i))
-            expect_error(kc$full_join(ds[[i]], i))
-            expect_error(kc$semi_join(ds[[i]], i))
-            expect_error(kc$anti_join(ds[[i]], i))
-            # remote
-            expect_error(kc$inner_join(i, i))
-            expect_error(kc$left_join(i, i))
-            expect_error(kc$right_join(i, i))
-            expect_error(kc$full_join(i, i))
-            expect_error(kc$semi_join(i, i))
-            expect_error(kc$anti_join(i, i))
-        }
-    }
-})
-
-
-
 ## VALIDATING SAME DATASET JOIN
 
 ## local vs. local
