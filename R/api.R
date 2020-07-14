@@ -1218,7 +1218,7 @@ Kibior <- R6Class(
         #' kc <- Kibior$new("elasticsearch")
         #' }
         #' 
-        #' # get kibior var from ".Renviron" file
+        #' # get kibior var from env (".Renviron" file or local env) 
         #' dd <- system.file("doc_env", "kibior_build.R", package = "kibior")
         #' source(dd, local = TRUE)
         #' kc <- .kibior_get_instance_from_env()
