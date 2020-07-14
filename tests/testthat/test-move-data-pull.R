@@ -95,7 +95,7 @@ test_that("kibior::pull, wrong args", {
     }
     # query
     for(i in a){
-        if(is.character(i) && i != "NOPE"){ # this works but returns no results
+        if(is.character(i) & i != "NOPE"){ # this works but returns no results
         expect_error(kc$pull(single_index_name, query = i))
         }
     }
@@ -174,9 +174,7 @@ test_that("kibior::pull, wrong index names", {
     }
     expect_setequal(kc$list(), names(ds))
     #
-    res <- kc$pull("aaaa")
-    expect_true(length(res) == 0)
-    expect_true(typeof(res) == "list")
+    expect_null(kc$pull("aaaa"))
 })
 
 
