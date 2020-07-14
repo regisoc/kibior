@@ -23,11 +23,11 @@ r:
   - bioc-devel
 
 env:
-  - ES_VERSION=6.8.9 R_COV=true KIBIOR_BUILD_ES_ENDPOINT=$KIBIOR_IPADDRESS KIBIOR_BUILD_ES_PORT=$KIBIOR_PORT
-  - ES_VERSION=7.5.2 R_COV=true KIBIOR_BUILD_ES_ENDPOINT=$KIBIOR_IPADDRESS KIBIOR_BUILD_ES_PORT=$KIBIOR_PORT
-  - ES_VERSION=7.6.2 R_COV=true KIBIOR_BUILD_ES_ENDPOINT=$KIBIOR_IPADDRESS KIBIOR_BUILD_ES_PORT=$KIBIOR_PORT
-  - ES_VERSION=7.7.1 R_COV=true KIBIOR_BUILD_ES_ENDPOINT=$KIBIOR_IPADDRESS KIBIOR_BUILD_ES_PORT=$KIBIOR_PORT
-  - ES_VERSION=7.8.0 R_COV=true KIBIOR_BUILD_ES_ENDPOINT=$KIBIOR_IPADDRESS KIBIOR_BUILD_ES_PORT=$KIBIOR_PORT
+  - ES_VERSION=6.8.9 R_COV=true
+  - ES_VERSION=7.5.2 R_COV=true
+  - ES_VERSION=7.6.2 R_COV=true
+  - ES_VERSION=7.7.1 R_COV=true
+  - ES_VERSION=7.8.0 R_COV=true
 
 ## PROCESS
 
@@ -49,11 +49,16 @@ r_packages:
 
 # install call
 
+# bioc_packages:
+#   - rtracklayer
+#   - Rsamtools
+#   - Biostrings
+
 # call port=9200 (default) and endpoint based on init ipaddress
 before_script:
-  - export KIBIOR_PORT=9200
-  - export KIBIOR_IPADDRESS=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $CID)
-  - curl -X GET "$KIBIOR_IPADDRESS:$KIBIOR_PORT/_cluster/health?pretty"
+  - export KIBIOR_BUILD_ES_PORT=9200
+  - export KIBIOR_BUILD_ES_ENDPOINT=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $CID)
+  - curl -X GET "$KIBIOR_BUILD_ES_ENDPOINT:$KIBIOR_BUILD_ES_PORT/_cluster/health?pretty"
 
 # script call
 # https://docs.travis-ci.com/user/languages/r/#customizing-the-travis-build-steps
