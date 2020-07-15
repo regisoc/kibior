@@ -7,7 +7,6 @@ citEntry(
     year        = "2020",
     url         = "https://github.com/regisoc/kibior",
     note        = "WIP.",
-
     textVersion =
     paste(
         "Régis Ongaro-Carcy (2020).",

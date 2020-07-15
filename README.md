@@ -8,7 +8,36 @@
 
 ## What
 
-**kibior** is a R package dedicated to ease the pain of searching, selecting, filtering, sharing, managing,... data. It allows to **pull and push** tabular data from/to any accessible Elasticsearch instances. 
+**kibior** is a R package dedicated to ease the pain of data manipulation. 
+Its main features allow **pushing, pulling, sharing and searching** tabular data.
 
 
+## Where
 
+**kibior** is using Elasticsearch as database and search engine. 
+
+
+## Who
+
+**kibior** mainly targets data scientists
+
+
+## How
+
+```r
+library(kibior)
+
+# Get an instance
+kc <- Kibior$new("server_or_address")
+
+# Push
+dplyr::starwars %>% kc$push("sw")
+
+# Search
+kc$search("sw", query = "my_query")
+
+# Pull
+kc$pull("sw")
+```
+
+## 
