@@ -15,6 +15,8 @@ git:
 # force all warning to be errros
 warnings_are_errors: true
 # pandoc: false
+# run BiocCheck
+bioc_check: true
 
 r: 
   - release
@@ -23,11 +25,11 @@ r:
   - bioc-devel
 
 env:
-  - ES_VERSION=6.8.9 R_COV=true
-  - ES_VERSION=7.5.2 R_COV=true
-  - ES_VERSION=7.6.2 R_COV=true
-  - ES_VERSION=7.7.1 R_COV=true
-  - ES_VERSION=7.8.0 R_COV=true
+  - ES_VERSION=6.8.9 R_COV=true _R_CHECK_FORCE_SUGGESTS_=false
+  - ES_VERSION=7.5.2 R_COV=true _R_CHECK_FORCE_SUGGESTS_=false
+  - ES_VERSION=7.6.2 R_COV=true _R_CHECK_FORCE_SUGGESTS_=false
+  - ES_VERSION=7.7.1 R_COV=true _R_CHECK_FORCE_SUGGESTS_=false
+  - ES_VERSION=7.8.0 R_COV=true _R_CHECK_FORCE_SUGGESTS_=false
 
 ## PROCESS
 
@@ -35,6 +37,7 @@ services:
   - docker
 
 before_install:
+  - Rscript --version
   - docker --version
   - docker pull docker.elastic.co/elasticsearch/elasticsearch:$ES_VERSION
   - CID=$(docker run -d -p 9200:9200 --name "elasticsearch" -e "discovery.type=single-node" -e "transport.host=127.0.0.1" -e "xpack.security.enabled=false" docker.elastic.co/elasticsearch/elasticsearch:$ES_VERSION)
@@ -59,12 +62,14 @@ before_script:
   - export KIBIOR_BUILD_ES_PORT=9200
   - export KIBIOR_BUILD_ES_ENDPOINT=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $CID)
   - curl -X GET "$KIBIOR_BUILD_ES_ENDPOINT:$KIBIOR_BUILD_ES_PORT/_cluster/health?pretty"
+  - wget https://raw.githubusercontent.com/Bioconductor/packagebuilder/master/check.Renviron
+  - export R_CHECK_ENVIRON=check.Renviron
 
 # script call
 # https://docs.travis-ci.com/user/languages/r/#customizing-the-travis-build-steps
 
 after_success:
-  - if [[ "${R_COV}" ]]; then Rscript -e 'covr::codecov()'; fi
+  - if [[ "${R_COV}" ]]; then Rscript -e 'covr::codecov(type="all")'; fi
 
 ## NOTIF
 
