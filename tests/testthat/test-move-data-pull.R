@@ -50,13 +50,8 @@ test_that("kibior::pull, wrong args", {
     expect_error(kc$pull(0))
     expect_error(kc$pull(-1))
     expect_error(kc$pull(-10))
-    # expect_error(kc$pull(NULL))
-    # expect_error(kc$pull(c()))
-    # expect_error(kc$pull(c("w", "e", "s", "h")))
-    # expect_error(kc$pull(c("name", "nope")))
     expect_error(kc$pull(list()))
     expect_error(kc$pull(list("w", "e", "s", "h")))
-    # expect_error(kc$pull("NOPE"))
     # bulk 
     for(i in a){
         expect_error(kc$pull(single_index_name, bulk_size = NA))
@@ -75,7 +70,7 @@ test_that("kibior::pull, wrong args", {
     # keep metadata 
     for(i in a){
         if(!is.logical(i)){
-        expect_error(kc$pull(single_index_name, keep_metadata = i))
+            expect_error(kc$pull(single_index_name, keep_metadata = i))
         }
     }
     expect_error(kc$pull(single_index_name, keep_metadata = NA))
@@ -83,20 +78,21 @@ test_that("kibior::pull, wrong args", {
     for(i in a){
         # if columns is not null or string, else it returns everything
         if(!purrr::is_null(i) && !is.character(i)){ 
-        expect_error(kc$pull(single_index_name, columns = i))
+            
+            expect_error(kc$pull(single_index_name, columns = i))
         }
     }
     # columns filters with metadata
     for(i in a){
         # if columns is not null or string, else it returns everything
         if(!purrr::is_null(i) && !is.character(i)){ 
-        expect_error(kc$pull(single_index_name, keep_metadata = TRUE, columns = i))
+            expect_error(kc$pull(single_index_name, keep_metadata = TRUE, columns = i))
         }
     }
     # query
     for(i in a){
-        if(is.character(i) & i != "NOPE"){ # this works but returns no results
-        expect_error(kc$pull(single_index_name, query = i))
+        if(is.character(i) && !("NOPE" %in% i)){ # this works but returns no results
+            expect_error(kc$pull(single_index_name, query = i))
         }
     }
 })
