@@ -3517,8 +3517,8 @@ Kibior <- R6Class(
 
 
 #' 
-#' @title [static] Kibior is instance
-#' @name [static] Kibior is instance
+#' @title Static - Kibior is instance
+#' @name Static - Kibior is instance
 #' 
 #' @details
 #' Tests if a given object is a Kibior instance.
@@ -3538,8 +3538,8 @@ Kibior$is_instance <- function(other){
 }
 
 #' 
-#' @title [static] Tests if packages are installed
-#' @name [static] Tests if packages are installed
+#' @title Static - Tests if packages are installed
+#' @name Static - Tests if packages are installed
 #' 
 #' @details
 #' Given a vector of string, returns a list of packages that are not installed 
@@ -3557,8 +3557,8 @@ Kibior$.pkg_not_installed <- function(pkg_names){
 }
 
 #' 
-#' @title [static] Install packages
-#' @name [static] Install packages
+#' @title Static - Install packages
+#' @name Static - Install packages
 #' 
 #' @details
 #' Check packages installation in the current env from a given list
