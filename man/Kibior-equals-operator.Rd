@@ -24,6 +24,6 @@ Call kibioR `$eq()` for a comparison of the two instances.
 \seealso{
 Other comparison: 
 \code{\link{Kibior not-equals operator}},
-\code{\link{[static] Kibior is instance}}
+\code{\link{Static - Kibior is instance}}
 }
 \concept{comparison}
