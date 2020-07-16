@@ -1,22 +1,25 @@
 
-#
 language: r
-cache: packages
 
+# GLOBAL
+
+cache: packages
 os: linux
 dist: bionic
 
 git:
   depth: false
 
-
-## MATRIX
-
 # force all warning to be errros
 warnings_are_errors: true
+
+# deactivate pandoc
 # pandoc: false
+
 # run BiocCheck
 bioc_check: true
+
+# MATRIX: R version x env
 
 r: 
   - release
@@ -31,27 +34,25 @@ env:
   - ES_VERSION=7.7.1 R_COV=true _R_CHECK_FORCE_SUGGESTS_=false
   - ES_VERSION=7.8.0 R_COV=true _R_CHECK_FORCE_SUGGESTS_=false
 
-## PROCESS
+# PROCESS
 
 services:
   - docker
 
 before_install:
   - Rscript --version
+  - tlmgr install index
   - docker --version
   - docker pull docker.elastic.co/elasticsearch/elasticsearch:$ES_VERSION
   - CID=$(docker run -d -p 9200:9200 --name "elasticsearch" -e "discovery.type=single-node" -e "transport.host=127.0.0.1" -e "xpack.security.enabled=false" docker.elastic.co/elasticsearch/elasticsearch:$ES_VERSION)
 
-# code coverage lib
-# ES has enough times to start
 r_github_packages:
   - r-lib/covr
 
 r_packages:
   - rmarkdown
 
-# install call
-
+# # options
 # bioc_packages:
 #   - rtracklayer
 #   - Rsamtools
@@ -62,8 +63,8 @@ before_script:
   - export KIBIOR_BUILD_ES_PORT=9200
   - export KIBIOR_BUILD_ES_ENDPOINT=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $CID)
   - curl -X GET "$KIBIOR_BUILD_ES_ENDPOINT:$KIBIOR_BUILD_ES_PORT/_cluster/health?pretty"
-  - wget https://raw.githubusercontent.com/Bioconductor/packagebuilder/master/check.Renviron
-  - export R_CHECK_ENVIRON=check.Renviron
+  - wget https://raw.githubusercontent.com/Bioconductor/packagebuilder/master/check.Renviron -P /tmp
+  - export R_CHECK_ENVIRON=/tmp/check.Renviron
 
 # script call
 # https://docs.travis-ci.com/user/languages/r/#customizing-the-travis-build-steps
@@ -73,7 +74,7 @@ after_success:
 
 ## NOTIF
 
-notifications:
-  email:
-    on_success: never
+# notifications:
+  # email:
+    # on_success: never
     # on_failure: never
