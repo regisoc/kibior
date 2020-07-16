@@ -4,7 +4,7 @@ Package: kibior
 Version: 0.99.0
 Encoding: UTF-8
 VignetteBuilder: knitr
-RoxygenNote: 7.1.0.9000
+RoxygenNote: 7.1.1
 biocViews: DataImport, DataRepresentation, ThirdPartyClient
 URL: https://github.com/regisoc/kibior
 BugReports: https://github.com/regisoc/kibior/issues
