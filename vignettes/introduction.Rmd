@@ -1292,7 +1292,7 @@ Filter on partial string matching:
 ```{r}
 #> Tidyverse, we have to use `str_detect`
 s <- dplyr::starwars %>% 
-        dplyr::filter(str_detect(name, "Luk|Dar"))
+        dplyr::filter(stringr::str_detect(name, "Luk|Dar"))
 
 #> `kibior, nothing else required
 s <- kc$pull("starwars", 
