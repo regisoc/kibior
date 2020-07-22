@@ -920,7 +920,7 @@ Kibior <- R6Class(
         #' @field cluster_name Access the cluster name if and only if already connected.
         cluster_name = function(value){
             "Access the cluster name if and only if already connected."
-            "Shortcut to `$stats()$cluster_name`"
+            "Shortcut to `$infos()$cluster_name`"
             ""
             "@examples"
             "kc <- Kibior()"
@@ -931,7 +931,7 @@ Kibior <- R6Class(
             "@return A string representing the cluster name"
 
             if(missing(value)) {
-                self$stats()$cluster_name
+                self$infos()$cluster_name
             } else {
                 stop(private$err_active_is_read_only("$cluster_name"), call. = FALSE)
             }
@@ -940,7 +940,7 @@ Kibior <- R6Class(
         #' @field cluster_status Access the cluster status if and only if already connected.
         cluster_status = function(value){
             "Access the cluster status if and only if already connected."
-            "Shortcut to `$stats()$status`"
+            "Shortcut to `$infos()$status`"
             ""
             "@examples"
             "kc <- Kibior()"
@@ -951,7 +951,7 @@ Kibior <- R6Class(
             "@return A string representing the cluster status ('green', 'yellow', or 'red')"
 
             if(missing(value)) {
-                self$stats()$status
+                self$infos()$status
             } else {
                 stop(private$err_active_is_read_only("$cluster_status"), call. = FALSE)
             }
@@ -961,7 +961,7 @@ Kibior <- R6Class(
         #'  already connected.
         nb_documents = function(value){
             "Access the current cluster total number of documents if and only if already connected."
-            "Shortcut to `$stats()$indices$docs$count`"
+            "Shortcut to `$infos()$indices$docs$count`"
             ""
             "@examples"
             "kc <- Kibior()"
@@ -972,7 +972,7 @@ Kibior <- R6Class(
             "@return A string representing the total number of recorded documents"
 
             if(missing(value)) {
-                self$stats()$indices$docs$count
+                self$infos()$indices$docs$count
             } else {
                 stop(private$err_active_is_read_only("$nb_documents"), call. = FALSE)
             }
@@ -1518,16 +1518,16 @@ Kibior <- R6Class(
 
 
         #' @details
-        #' Get stats about Elasticsearch cluster
+        #' Get informations about Elasticsearch cluster
         #'
         #' @family cluster-wealth
         #'
         #' @examples
-        #' kc$stats()
+        #' kc$infos()
         #'
         #' @return a list of statistics about the cluster
         #'
-        stats = function(){
+        infos = function(){
             suppressMessages({ 
                 r <- elastic::cluster_stats(self$connection) 
             })
@@ -1707,6 +1707,124 @@ Kibior <- R6Class(
             }
             if(length(res) == 0){
                 res <- NULL
+            }
+            if(self$quiet_results) invisible(res) else res
+        },
+
+        #' @details
+        #' Produces descriptive statistics of a column.
+        #' Returns a tibble composed of: count, min, max, avg, sum, 
+        #'  sum_of_squares, variance, std_deviation (+ upper and lower bounds).
+        #' Multiple warnings here. One for the count and one for the std_dev.
+        #' 1/ Counts: they are approximate, see vignette.
+        #' 2/ Std dev: as stated in ES documentation: "The standard deviation 
+        #' and its bounds are displayed by default, but they are not always 
+        #' applicable to all data-sets. Your data must be normally distributed 
+        #' for the metrics to make sense. The statistics behind standard 
+        #' deviations assumes normally distributed data, so if your data is 
+        #' skewed heavily left or right, the value returned will be misleading."
+        #'
+        #' @family crud-metadata
+        #'
+        #' @examples
+        #' # Stats of "sw" column "height"
+        #' kc$stats("sw", "height")
+        #' # if pattern
+        #' kc$stats("s*", "height")
+        #' # multiple indices and sigma definition
+        #' kc$stats(c("sw", "sw2"), "height", sigma = 2.5)
+        #' # multiple indices, multiple columns
+        #' kc$stats(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+        #'
+        #' @param index_name a vector of index names.
+        #' @param columns a vector of column names.
+        #' @param sigma  (default: NULL).
+        #' @param query a string as a query string syntax (default: NULL).
+        #'
+        #' @return a tibble with descriptive stats, one line by matching index.
+        #'
+        #' @seealso you should use \code{\link{count}} for more accurate count.
+        #'
+        stats = function(index_name, columns, sigma = NULL, query = NULL){
+            if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
+            if(!purrr::is_character(columns)) stop(private$err_param_type_character("columns"))
+            if(!purrr::is_null(sigma)){
+                if(length(sigma) > 1) stop(private$err_one_value("sigma"))
+                if(!is.numeric(sigma)) stop(private$err_param_type_numeric("sigma"))
+                if(sigma <= 0) stop(private$err_param_positive("sigma", zero_valid = FALSE))
+                if(self$verbose) message(" -> Using given sigma: ", sigma)
+            }
+            if(!purrr::is_null(query)){
+                if(!purrr::is_character(query)) stop(private$err_param_type_character("query"))
+                if(length(query) > 1) stop(private$err_one_value("query"))
+            }
+            #
+            involved_indices <- self$match(index_name)
+            # 
+            res <- list()
+            i <- 1
+            if(!purrr::is_null(involved_indices)){
+                # sigma def
+                s <- if(purrr::is_null(sigma)) "" else paste0(',"sigma":', sigma)
+                # searched cols
+                if(self$verbose){
+                    columns %>% 
+                        private$vector_to_str() %>% 
+                        message(" -> Searching column names: ", .)
+                    message(" -> Getting stats")
+                }
+                # 
+                for(ind in involved_indices){
+                    for(col in columns){
+                        # define agg
+                        agg_body <- paste0('{"size":0,"aggs":{"kaggs":{',
+                            '"extended_stats":{"field": "', col, '"', s, '}}}}')
+                        # req
+                        res[[i]] <- tryCatch(
+                            expr = {
+                                tmp <- elastic::Search(
+                                        self$connection, 
+                                        index = ind, 
+                                        size = 0, 
+                                        q = query,
+                                        body = agg_body
+                                    )$aggregations$kaggs
+                                if(tmp$count == 0) stop("null_value")
+                                tmp <- as.data.frame(tmp)
+                                # add name col
+                                tmp$index <- ind
+                                tmp$column <- col
+                                tmp
+                            },
+                            error = function(e){
+                                if("null_value" == e$message){
+                                    if(self$verbose){
+                                        message("   - Skipping absent column '", col, "' of '", ind, "'.")
+                                    }
+                                } else {
+                                    if(grepl("all shards failed", e$message, ignore.case = TRUE)){
+                                        if(self$verbose){
+                                            message("   - Skipping non numeric column '", col, "' of '", ind, "'.")
+                                        }
+                                    } else {
+                                        # reraise
+                                        stop(e$message)
+                                    }
+                                }
+                            }
+                        )
+                        i <- i+1
+                    }
+                }
+            }
+            if(length(res) == 0){
+                res <- NULL
+            } else {
+                res <- res %>% 
+                    data.table::rbindlist() %>% 
+                    tibble::as_tibble()
+                # change dot to underscore in names 
+                names(res) <- gsub("\\.", "_", names(res))
             }
             if(self$quiet_results) invisible(res) else res
         },
