@@ -209,6 +209,91 @@ Kibior <- R6Class(
         # methods - abstract & utils
         # --------------------------------------------------------------------------
 
+        single_value_metric_aggregation = function(aggregation_type, index_name, columns, query = NULL){
+            if(!purrr::is_character(aggregation_type)) stop(private$err_param_type_character("aggregation_type"))
+            if(length(aggregation_type) > 1) stop(private$err_one_value("aggregation_type"))
+            if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
+            if(!purrr::is_character(columns)) stop(private$err_param_type_character("columns"))
+            if(!purrr::is_null(query)){
+                if(!purrr::is_character(query)) stop(private$err_param_type_character("query"))
+                if(length(query) > 1) stop(private$err_one_value("query"))
+            }
+            #
+            involved_indices <- self$match(index_name)
+            # 
+            res <- list()
+            i <- 1
+            if(!purrr::is_null(involved_indices)){
+                # searched cols
+                if(self$verbose){
+                    columns %>% 
+                        private$vector_to_str() %>% 
+                        message(" -> Searching column names: ", .)
+                    message(" -> Getting ", aggregation_type)
+                }
+                # 
+                get_value <- function(v){
+                    if(self$version$major > 6) v$value else v
+                }
+                # 
+                for(ind in involved_indices){
+                    for(col in columns){
+                        # define agg
+                        agg_body <- paste0('{"size":0,"aggs":{"kaggs":{"',
+                            aggregation_type, '":{"field":"', col, '"}}}}')
+                        # req
+                        res[[i]] <- tryCatch(
+                            expr = {
+                                stmp <- elastic::Search(
+                                        self$connection, 
+                                        index = ind, 
+                                        size = 0, 
+                                        q = query,
+                                        body = agg_body
+                                    ) %>% 
+                                        .$aggregations %>% 
+                                        .$kaggs %>% 
+                                        get_value()
+                                if(purrr::is_null(stmp)) stop("null_value")
+                                #
+                                tmp <- list(
+                                    "index" = ind,
+                                    "column" = col
+                                )
+                                tmp[[aggregation_type]] <- stmp
+                                tmp
+                            },
+                            error = function(e){
+                                if("null_value" == e$message){
+                                    if(self$verbose){
+                                        message("   - Skipping absent column '", col, "' of '", ind, "'.")
+                                    }
+                                } else {
+                                    if(grepl("all shards failed", e$message, ignore.case = TRUE)){
+                                        if(self$verbose){
+                                            message("   - Skipping non numeric column '", col, "' of '", ind, "'.")
+                                        }
+                                    } else {
+                                        # reraise
+                                        stop(e$message)
+                                    }
+                                }
+                            }
+                        )
+                        i <- i+1
+                    }
+                }
+            }
+            if(length(res) == 0){
+                res <- NULL
+            } else {
+                res <- res %>% 
+                    data.table::rbindlist() %>% 
+                    tibble::as_tibble()
+            }
+            if(self$quiet_results) invisible(res) else res
+        },
+
         join = function(join_type = NULL, left_index, right_index, left_columns = NULL, left_query = NULL, left_bulk_size = 500, left_max_size = NULL, right_columns = NULL, right_query = NULL, right_bulk_size = 500, right_max_size = NULL, by = NULL, keep_metadata = FALSE) {
             "[Abstract method] Execute a join between two datasets using `dplyr` joins."
             "The datasets can be in-memory (variable name) or the name of an currently stored Elasticsearch index."
@@ -1710,6 +1795,99 @@ Kibior <- R6Class(
             }
             if(self$quiet_results) invisible(res) else res
         },
+
+        #' @details
+        #' Get the average value of a column.
+        #' 
+        #' @family crud-metadata
+        #'
+        #' @examples
+        #' # Avg of "sw" column "height"
+        #' kc$avg("sw", "height")
+        #' # if pattern
+        #' kc$avg("s*", "height")
+        #' # multiple indices, multiple columns
+        #' kc$avg(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+        #'
+        #' @param index_name a vector of index names.
+        #' @param columns a vector of column names.
+        #' @param query a string as a query string syntax (default: NULL).
+        #'
+        #' @return a tibble with avg, one line by matching index and column.
+        #'
+        avg = function(index_name, columns, query = NULL){
+            private$single_value_metric_aggregation("avg", index_name, columns, query = query)
+        },
+
+        #' @details
+        #' Get the minimum value of a column.
+        #' 
+        #' @family crud-metadata
+        #'
+        #' @examples
+        #' # min of "sw" column "height"
+        #' kc$min("sw", "height")
+        #' # if pattern
+        #' kc$min("s*", "height")
+        #' # multiple indices, multiple columns
+        #' kc$min(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+        #'
+        #' @param index_name a vector of index names.
+        #' @param columns a vector of column names.
+        #' @param query a string as a query string syntax (default: NULL).
+        #'
+        #' @return a tibble with min, one line by matching index and column.
+        #'
+        min = function(index_name, columns, query = NULL){
+            private$single_value_metric_aggregation("min", index_name, columns, query = query)
+        },
+
+        #' @details
+        #' Get the maximum value of a column.
+        #'
+        #' @family crud-metadata
+        #'
+        #' @examples
+        #' # max of "sw" column "height"
+        #' kc$max("sw", "height")
+        #' # if pattern
+        #' kc$max("s*", "height")
+        #' # multiple indices, multiple columns
+        #' kc$max(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+        #'
+        #' @param index_name a vector of index names.
+        #' @param columns a vector of column names.
+        #' @param query a string as a query string syntax (default: NULL).
+        #'
+        #' @return a tibble with max, one line by matching index and column.
+        #'
+        max = function(index_name, columns, query = NULL){
+            private$single_value_metric_aggregation("max", index_name, columns, query = query)
+        },
+
+        #' @details
+        #' Get the sum of a column.
+        #'
+        #' @family crud-metadata
+        #'
+        #' @examples
+        #' # sum of "sw" column "height"
+        #' kc$sum("sw", "height")
+        #' # if pattern
+        #' kc$sum("s*", "height")
+        #' # multiple indices, multiple columns
+        #' kc$sum(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+        #'
+        #' @param index_name a vector of index names.
+        #' @param columns a vector of column names.
+        #' @param query a string as a query string syntax (default: NULL).
+        #'
+        #' @return a tibble with sum, one line by matching index and column.
+        #'
+        sum = function(index_name, columns, query = NULL){
+            private$single_value_metric_aggregation("sum", index_name, columns, query = query)
+        },
+
 
         #' @details
         #' Produces descriptive statistics of a column.
