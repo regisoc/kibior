@@ -544,25 +544,6 @@ kc$count("s*")
 As `$search()` and `$pull()`, this method accepts a `query` parameter to count the number of hits in your dataset following a query. See [`Querying`](#querying) in `Advanced usage` section for more information. 
 
 
-## `$stats()`: base statistics of columns
-
-Adding up to data handling, `kibior` displays some descriptive statistical methods.
-The `$stats()` method is a shortcut to ask for: `count`, `min`, `max`, `avg`, `sum`, `sum_of_squares`, `variance`, `std_deviation `, `std_deviation_upper (bound)`, `std_deviation_lower (bound)`.
-
-```{r stats-base}
-#> multi-indices, index pattern and multicolumns
-kc$stats(c("sw", "s*"), c("height", "mass"))
-
-#> work also with query and sigma for standard deviation
-kc$stats("sw", c("height", "mass"), sigma = 2.5, query = "homeworld:naboo")
-```
-
-> Some important warnings here:
->
-> 1. [Counts are approximate](https://www.elastic.co/guide/en/elasticsearch/reference/current/search-aggregations-metrics-cardinality-aggregation.html#_counts_are_approximate)
-> 2. [Standard Deviation and Bounds require normality](https://www.elastic.co/guide/en/elasticsearch/reference/current/search-aggregations-metrics-extendedstats-aggregation.html#_standard_deviation_bounds)
-
-
 
 ## `$keys()`: List all unique keys of an Elasticsearch index column
 
@@ -766,6 +747,83 @@ With `$verbose <- TRUE`, it will be printed in the result as "**Head mode: on**"
 To get the full result, you have to use `$search(head = FALSE)`, or more simply : `$pull()`.
 
 See [`Querying`](#querying) in `Advanced usage` section for more information.
+
+
+## `$stats()`: base statistics of columns
+
+Alongside data handling methods are descriptive statistical methods. 
+You already know `$count()` but here some others displayed by `kibior`.
+
+The `$stats()` method is a shortcut to ask for: `count`, `min`, `max`, `avg`, `sum`, `sum_of_squares`, `variance`, `std_deviation `, `std_deviation_upper (bound)`, `std_deviation_lower (bound)`.
+
+```{r stats-base}
+#> multi-indices, index pattern and multicolumns
+kc$stats(c("sw", "s*"), c("height", "mass"))
+
+#> work also with query and sigma for standard deviation
+kc$stats("sw", c("height", "mass"), sigma = 2.5, query = "homeworld:naboo")
+```
+
+> Some important warnings here:
+>
+> 1. [Counts are approximate](https://www.elastic.co/guide/en/elasticsearch/reference/current/search-aggregations-metrics-cardinality-aggregation.html#_counts_are_approximate)
+> 2. [Standard Deviation and Bounds require normality](https://www.elastic.co/guide/en/elasticsearch/reference/current/search-aggregations-metrics-extendedstats-aggregation.html#_standard_deviation_bounds)
+
+
+
+## `$min()`: get the minimum of some columns
+
+```{r min-base}
+#> "sw" column "height"
+kc$min("sw", "height")
+
+#> if pattern
+kc$min("s*", "height")
+
+#> multiple indices, multiple columns
+kc$min(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+```
+
+## `$max()`: get the maximum of some columns
+
+```{r max-base}
+#> "sw" column "height"
+kc$max("sw", "height")
+
+#> if pattern
+kc$max("s*", "height")
+
+#> multiple indices, multiple columns
+kc$max(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+```
+
+## `$avg()`: get the average of some columns
+
+```{r avg-base}
+#> "sw" column "height"
+kc$avg("sw", "height")
+
+#> if pattern
+kc$avg("s*", "height")
+
+#> multiple indices, multiple columns
+kc$avg(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+```
+
+## `$sum()`: get the sum of some columns
+
+```{r sum-base}
+#> "sw" column "height"
+kc$sum("sw", "height")
+
+#> if pattern
+kc$sum("s*", "height")
+
+#> multiple indices, multiple columns
+kc$sum(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+```
+
+
 
 
 
