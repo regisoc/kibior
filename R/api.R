@@ -237,13 +237,21 @@ Kibior <- R6Class(
                 }
                 # 
                 for(ind in involved_indices){
+                    # get all columns from an index
+                    real_columns <- suppressMessages({ self$columns(ind)[[ind]] })
+                    #
                     for(col in columns){
-                        # define agg
-                        agg_body <- paste0('{"size":0,"aggs":{"kaggs":{"',
-                            aggregation_type, '":{"field":"', col, '"}}}}')
                         # req
                         res[[i]] <- tryCatch(
                             expr = {
+                                # raise an error if the col is not known
+                                # should not happen but sum() actually let the
+                                # unknown column with 0 as default value
+                                if(!(col %in% real_columns)) stop("ABSENT_COLUMN")
+                                # define agg
+                                agg_body <- paste0('{"size":0,"aggs":{"kaggs":{"',
+                                    aggregation_type, '":{"field":"', col, '"}}}}')
+                                #req
                                 stmp <- elastic::Search(
                                         self$connection, 
                                         index = ind, 
@@ -254,7 +262,7 @@ Kibior <- R6Class(
                                         .$aggregations %>% 
                                         .$kaggs %>% 
                                         get_value()
-                                if(purrr::is_null(stmp)) stop("null_value")
+                                if(purrr::is_null(stmp)) stop("ABSENT_COLUMN")
                                 #
                                 tmp <- list(
                                     "index" = ind,
@@ -264,7 +272,7 @@ Kibior <- R6Class(
                                 tmp
                             },
                             error = function(e){
-                                if("null_value" == e$message){
+                                if("ABSENT_COLUMN" == e$message){
                                     if(self$verbose){
                                         message("   - Skipping absent column '", col, "' of '", ind, "'.")
                                     }
