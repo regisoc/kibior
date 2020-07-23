@@ -222,7 +222,6 @@ Kibior <- R6Class(
             involved_indices <- self$match(index_name)
             # 
             res <- list()
-            i <- 1
             if(!purrr::is_null(involved_indices)){
                 # searched cols
                 if(self$verbose){
@@ -237,12 +236,13 @@ Kibior <- R6Class(
                 }
                 # 
                 for(ind in involved_indices){
+                    res[[ind]] <- list()
                     # get all columns from an index
                     real_columns <- suppressMessages({ self$columns(ind)[[ind]] })
                     #
                     for(col in columns){
                         # req
-                        res[[i]] <- tryCatch(
+                        res[[ind]][[col]] <- tryCatch(
                             expr = {
                                 # raise an error if the col is not known
                                 # should not happen but sum() actually let the
@@ -263,12 +263,11 @@ Kibior <- R6Class(
                                         .$kaggs %>% 
                                         get_value()
                                 if(purrr::is_null(stmp)) stop("ABSENT_COLUMN")
-                                #
-                                tmp <- list(
-                                    "index" = ind,
-                                    "column" = col
-                                )
+                                # add index and col names
+                                tmp <- list()
                                 tmp[[aggregation_type]] <- stmp
+                                tmp <- as.data.frame(tmp)
+                                tmp <- cbind(column = col, tmp)
                                 tmp
                             },
                             error = function(e){
@@ -288,16 +287,122 @@ Kibior <- R6Class(
                                 }
                             }
                         )
-                        i <- i+1
+                    }
+                    #
+                    if(!private$is_list_empty(res[[ind]])){
+                        res[[ind]] <- res[[ind]] %>% 
+                            data.table::rbindlist() %>% 
+                            tibble::as_tibble()
+                        # change dot to underscore in names 
+                        names(res[[ind]]) <- gsub("\\.", "_", names(res[[ind]]))
                     }
                 }
             }
             if(length(res) == 0){
                 res <- NULL
-            } else {
-                res <- res %>% 
-                    data.table::rbindlist() %>% 
-                    tibble::as_tibble()
+            }
+            if(self$quiet_results) invisible(res) else res
+        },
+
+        multi_value_metric_aggregation = function(aggregation_type, index_name, columns, function_test_null_result = NULL, aggregation_supplementary_args = NULL, query = NULL){
+            if(!purrr::is_character(aggregation_type)) stop(private$err_param_type_character("aggregation_type"))
+            if(length(aggregation_type) > 1) stop(private$err_one_value("aggregation_type"))
+            if(!purrr::is_null(aggregation_supplementary_args)){
+                if(!purrr::is_character(aggregation_supplementary_args)) stop(private$err_param_type_character("aggregation_supplementary_args"))
+                if(length(aggregation_supplementary_args) > 1) stop(private$err_one_value("aggregation_supplementary_args"))
+            }
+            if(purrr::is_null(function_test_null_result)) stop("need a function to test the metrics.")
+            if(!("closure" %in% typeof(function_test_null_result))) stop("not a function, need a funciton to test the metrics.")
+            if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
+            if(!purrr::is_character(columns)) stop(private$err_param_type_character("columns"))
+            if(purrr::is_null(aggregation_supplementary_args)) stop("no aggregation body.")
+            if(!purrr::is_character(aggregation_supplementary_args)) stop("no aggregation body.")
+            if(length(aggregation_supplementary_args) > 1) stop("aggregation body error.")
+            if(!purrr::is_null(query)){
+                if(!purrr::is_character(query)) stop(private$err_param_type_character("query"))
+                if(length(query) > 1) stop(private$err_one_value("query"))
+            }
+            #
+            involved_indices <- self$match(index_name)
+            # 
+            res <- list()
+            if(!purrr::is_null(involved_indices)){
+                # supplementary args for req body
+                s <- if(purrr::is_null(aggregation_supplementary_args)) "" else aggregation_supplementary_args
+                # searched cols
+                if(self$verbose){
+                    columns %>% 
+                        private$vector_to_str() %>% 
+                        message(" -> Searching column names: ", .)
+                    message(" -> Getting ", aggregation_type)
+                }
+                # total according to ES version
+                get_values <- function(v){
+                    if(self$version$major > 6) v$values else v
+                }
+                # 
+                for(ind in involved_indices){
+                    res[[ind]] <- list()
+                    # get all columns from an index
+                    real_columns <- suppressMessages({ self$columns(ind)[[ind]] })
+                    for(col in columns){
+                        # define agg
+                        agg_body <- paste0('{"size":0,"aggs":{"kaggs":{"', 
+                            aggregation_type, '":{"field": "', col, '"', s, '}}}}')
+                        # req
+                        res[[ind]][[col]] <- tryCatch(
+                            expr = {
+                                # raise an error if the col is not known
+                                # should not happen but sum() actually let the
+                                # unknown column with 0 as default value
+                                if(!(col %in% real_columns)) stop("ABSENT_COLUMN")
+                                # req
+                                tmp <- elastic::Search(
+                                        self$connection, 
+                                        index = ind, 
+                                        size = 0, 
+                                        q = query,
+                                        body = agg_body
+                                    ) %>% 
+                                        .$aggregations %>% 
+                                        .$kaggs %>% 
+                                        get_values()
+                                if(function_test_null_result(tmp)) stop("ABSENT_COLUMN")
+                                # add index and col names
+                                tmp <- as.data.frame(tmp)
+                                tmp <- cbind(column = col, tmp)
+                                tmp
+                            },
+                            error = function(e){
+                                if( e$message == "ABSENT_COLUMN"){
+                                    if(self$verbose){
+                                        message("   - Skipping absent column '", col, "' of '", ind, "'.")
+                                    }
+                                } else {
+                                    if(grepl("all shards failed", e$message, ignore.case = TRUE)){
+                                        if(self$verbose){
+                                            message("   - Skipping non numeric column '", col, "' of '", ind, "'.")
+                                        }
+                                    } else {
+                                        # reraise
+                                        stop(e$message)
+                                    }
+                                }
+                            }
+                        )
+                    }
+                    #
+                    if(!private$is_list_empty(res[[ind]])){
+                        res[[ind]] <- res[[ind]] %>% 
+                            data.table::rbindlist() %>% 
+                            tibble::as_tibble()
+                        # change dot to underscore in names 
+                        names(res[[ind]]) <- gsub("\\.", "_", names(res[[ind]]))
+                    }
+                }
+            }
+            if(length(res) == 0){
+                res <- NULL
             }
             if(self$quiet_results) invisible(res) else res
         },
@@ -1828,6 +1933,36 @@ Kibior <- R6Class(
         },
 
         #' @details
+        #' Get the mean value of a column.
+        #' 
+        #' @family crud-metadata
+        #'
+        #' @examples
+        #' # mean of "sw" column "height"
+        #' kc$mean("sw", "height")
+        #' # if pattern
+        #' kc$mean("s*", "height")
+        #' # multiple indices, multiple columns
+        #' kc$mean(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+        #'
+        #' @param index_name a vector of index names.
+        #' @param columns a vector of column names.
+        #' @param query a string as a query string syntax (default: NULL).
+        #'
+        #' @return a tibble with mean, one line by matching index and column.
+        #'
+        mean = function(index_name, columns, query = NULL){
+            args <- list(index_name, columns, query = query)
+            tmp <- dplyr::inner_join(
+                do.call(self$min, args), 
+                do.call(self$max, args), 
+                by = c("column", "index")
+            )
+            tmp$mean <- ((tmp$min + tmp$max)/2)
+            tmp[c("index", "column", "mean")]
+        },
+
+        #' @details
         #' Get the minimum value of a column.
         #' 
         #' @family crud-metadata
@@ -1938,82 +2073,88 @@ Kibior <- R6Class(
                 if(length(sigma) > 1) stop(private$err_one_value("sigma"))
                 if(!is.numeric(sigma)) stop(private$err_param_type_numeric("sigma"))
                 if(sigma <= 0) stop(private$err_param_positive("sigma", zero_valid = FALSE))
-                if(self$verbose) message(" -> Using given sigma: ", sigma)
+                if(self$verbose) message(" -> Using sigma: ", sigma)
             }
             if(!purrr::is_null(query)){
                 if(!purrr::is_character(query)) stop(private$err_param_type_character("query"))
                 if(length(query) > 1) stop(private$err_one_value("query"))
             }
             #
-            involved_indices <- self$match(index_name)
-            # 
-            res <- list()
-            i <- 1
-            if(!purrr::is_null(involved_indices)){
-                # sigma def
-                s <- if(purrr::is_null(sigma)) "" else paste0(',"sigma":', sigma)
-                # searched cols
-                if(self$verbose){
-                    columns %>% 
-                        private$vector_to_str() %>% 
-                        message(" -> Searching column names: ", .)
-                    message(" -> Getting stats")
-                }
-                # 
-                for(ind in involved_indices){
-                    for(col in columns){
-                        # define agg
-                        agg_body <- paste0('{"size":0,"aggs":{"kaggs":{',
-                            '"extended_stats":{"field": "', col, '"', s, '}}}}')
-                        # req
-                        res[[i]] <- tryCatch(
-                            expr = {
-                                tmp <- elastic::Search(
-                                        self$connection, 
-                                        index = ind, 
-                                        size = 0, 
-                                        q = query,
-                                        body = agg_body
-                                    )$aggregations$kaggs
-                                if(tmp$count == 0) stop("null_value")
-                                tmp <- as.data.frame(tmp)
-                                # add name col
-                                tmp$index <- ind
-                                tmp$column <- col
-                                tmp
-                            },
-                            error = function(e){
-                                if("null_value" == e$message){
-                                    if(self$verbose){
-                                        message("   - Skipping absent column '", col, "' of '", ind, "'.")
-                                    }
-                                } else {
-                                    if(grepl("all shards failed", e$message, ignore.case = TRUE)){
-                                        if(self$verbose){
-                                            message("   - Skipping non numeric column '", col, "' of '", ind, "'.")
-                                        }
-                                    } else {
-                                        # reraise
-                                        stop(e$message)
-                                    }
-                                }
-                            }
-                        )
-                        i <- i+1
-                    }
-                }
-            }
-            if(length(res) == 0){
-                res <- NULL
-            } else {
-                res <- res %>% 
-                    data.table::rbindlist() %>% 
-                    tibble::as_tibble()
-                # change dot to underscore in names 
-                names(res) <- gsub("\\.", "_", names(res))
-            }
-            if(self$quiet_results) invisible(res) else res
+            test_function <- function(e){ e$count == 0 }
+            supp_args <- if(purrr::is_null(sigma)) "" else paste0(',"sigma":', sigma)
+            #
+            private$multi_value_metric_aggregation("extended_stats", index_name, columns, 
+                                                    function_test_null_result = test_function, 
+                                                    aggregation_supplementary_args = supp_args, 
+                                                    query = query)
         },
+
+        # https://www.elastic.co/guide/en/elasticsearch/reference/6.8/search-aggregations-metrics-percentile-aggregation.html#search-aggregations-metrics-percentile-aggregation-approximation
+        percentiles = function(index_name, columns, percents = NULL, query = NULL){
+            if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
+            if(!purrr::is_character(columns)) stop(private$err_param_type_character("columns"))
+            if(!purrr::is_null(percents)){
+                if(!is.numeric(percents)) stop(private$err_param_type_numeric("percents"))
+                if(any(percents <= 0)) stop(private$err_param_positive("percents", zero_valid = FALSE))
+            } else {
+                percents <- c(25, 50, 75)
+            }
+            if(self$verbose){ 
+                percents %>% 
+                    private$vector_to_str() %>% 
+                    message(" -> Using percentiles: ", .)
+            }
+            if(!purrr::is_null(query)){
+                if(!purrr::is_character(query)) stop(private$err_param_type_character("query"))
+                if(length(query) > 1) stop(private$err_one_value("query"))
+            }
+            #
+            test_function <- function(e){
+                e %>% 
+                    lapply(function(m) purrr::is_null(m)) %>% 
+                    unlist(use.names = FALSE) %>% 
+                    any()
+            }
+            supp_args <- percents %>% paste0(collapse = ",") %>% paste0(',"percents":[', ., ']')
+            #
+            private$multi_value_metric_aggregation("percentiles", index_name, columns, 
+                                                    function_test_null_result = test_function, 
+                                                    aggregation_supplementary_args = supp_args, 
+                                                    query = query)
+        },
+
+        q1 = function(index_name, columns, query = NULL){
+            self$percentiles(index_name, columns, percents = 25, query = query)
+        },
+
+        q2 = function(index_name, columns, query = NULL){
+            self$percentiles(index_name, columns, percents = 50, query = query)
+        },
+
+        q3 = function(index_name, columns, query = NULL){
+            self$percentiles(index_name, columns, percents = 75, query = query)
+        },
+
+        median = function(index_name, columns, query = NULL){
+            self$q2(index_name, columns, query = query)
+        },
+
+        summary = function(index_name, columns, query = NULL){
+            args <- list(index_name, columns, query = query)
+            chain <- function(df, func){
+                dplyr::inner_join(
+                    df, do.call(func, args), 
+                    by = c("column", "index")
+                )
+            }
+            do.call(self$min, args) %>% 
+                chain(self$q1) %>%
+                chain(self$median) %>%
+                chain(self$mean) %>%
+                chain(self$q3) %>%
+                chain(self$max)
+        },
+
 
         #' @details
         #' Shortcut to `$count()` to match the classical `dim()` function pattern `[line col]`
