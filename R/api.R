@@ -167,25 +167,6 @@ Kibior <- R6Class(
             "fq"    = "reads",
             # json
             "json"  = "json"
-            # "sam" = alignments,
-            # # TODO: test
-            # # variant
-            # "vcf" = "variants",
-            # "gvf" = "variants",
-            # "vep" = "variants",
-            # # mass_spectrometry
-            # # MSnbase
-            # # https://bioconductor.org/packages/release/bioc/vignettes/MSnbase/inst/doc/v01-MSnbase-demo.html#2_data_structure_and_content
-            # "xml" = "mass_spectrometry",
-            # "mzxml" = "mass_spectrometry",
-            # "mzdata" = "mass_spectrometry",
-            # "mzml" = "mass_spectrometry",
-            # # TODO: check that
-            # "mgf" = "mass_spectrometry",
-            # "asc" = "mass_spectrometry",
-            # "pkl" = "mass_spectrometry",
-            # "dta" = "mass_spectrometry",
-            # "pks" = "mass_spectrometry"
         ),
 
 
@@ -210,6 +191,14 @@ Kibior <- R6Class(
         # --------------------------------------------------------------------------
 
         single_value_metric_aggregation = function(aggregation_type, index_name, columns, query = NULL){
+            "[Abstract method] Execute a single value metric aggregation."
+            "Mainly for avg, min, max, sum."
+            ""
+            "@param aggregation_type the aggregation to execute."
+            "@param index_name the indices to target."
+            "@param columns the columns to target."
+            "@param query the query to target some data. (default: NULL)"
+            "@return the list of tibble with the results."
             if(!purrr::is_character(aggregation_type)) stop(private$err_param_type_character("aggregation_type"))
             if(length(aggregation_type) > 1) stop(private$err_one_value("aggregation_type"))
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
@@ -305,6 +294,17 @@ Kibior <- R6Class(
         },
 
         multi_value_metric_aggregation = function(aggregation_type, index_name, columns, function_test_null_result = NULL, aggregation_supplementary_args = NULL, query = NULL){
+            "[Abstract method] Execute a multi value metric aggregation."
+            "Mainly for percentile, stats, summary, q1, q2, q3, median."
+            ""
+            "@param aggregation_type the aggregation to execute."
+            "@param index_name the indices to target."
+            "@param columns the columns to target."
+            "@param function_test_null_result the function to test the mull ES result (default: NULL)."
+            "@param aggregation_supplementary_args a string to pass to the request to add some args (default: NULL)."
+            "@param query the query to target some data (default: NULL)."
+            "@return the list of tibble with the results."
+
             if(!purrr::is_character(aggregation_type)) stop(private$err_param_type_character("aggregation_type"))
             if(length(aggregation_type) > 1) stop(private$err_one_value("aggregation_type"))
             if(!purrr::is_null(aggregation_supplementary_args)){
@@ -315,8 +315,7 @@ Kibior <- R6Class(
             if(!("closure" %in% typeof(function_test_null_result))) stop("not a function, need a funciton to test the metrics.")
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
             if(!purrr::is_character(columns)) stop(private$err_param_type_character("columns"))
-            if(purrr::is_null(aggregation_supplementary_args)) stop("no aggregation body.")
-            if(!purrr::is_character(aggregation_supplementary_args)) stop("no aggregation body.")
+            if(!purrr::is_null(aggregation_supplementary_args) && !purrr::is_character(aggregation_supplementary_args)) stop("aggregation args must be a string.")
             if(length(aggregation_supplementary_args) > 1) stop("aggregation body error.")
             if(!purrr::is_null(query)){
                 if(!purrr::is_character(query)) stop(private$err_param_type_character("query"))
@@ -336,11 +335,7 @@ Kibior <- R6Class(
                         message(" -> Searching column names: ", .)
                     message(" -> Getting ", aggregation_type)
                 }
-                # total according to ES version
-                get_values <- function(v){
-                    if(self$version$major > 6) v$values else v
-                }
-                # 
+                #
                 for(ind in involved_indices){
                     res[[ind]] <- list()
                     # get all columns from an index
@@ -365,8 +360,7 @@ Kibior <- R6Class(
                                         body = agg_body
                                     ) %>% 
                                         .$aggregations %>% 
-                                        .$kaggs %>% 
-                                        get_values()
+                                        .$kaggs
                                 if(function_test_null_result(tmp)) stop("ABSENT_COLUMN")
                                 # add index and col names
                                 tmp <- as.data.frame(tmp)
@@ -654,8 +648,6 @@ Kibior <- R6Class(
                 paste0("'", ., "'")
         },
 
-        
-
 
         # --------------------------------------------------------------------------
         # methods - Elastic utils
@@ -676,28 +668,38 @@ Kibior <- R6Class(
             if(purrr::is_null(p)) stop("Connection to '", self$host, ":", self$port, "' cannot be established.")
             # if connection is good
             msg <- paste0("Connected to '", p$cluster_name, "' at '", self$host, ":", self$port, "'")
-            if(self$verbose) msg <- paste0(msg, "[Elasticsearch version: ", p$version$number, "]")
+            if(self$verbose) msg <- paste0(msg, " [Elasticsearch ", p$version$number, "]")
             message(msg)
             # Catch ES version
-            private$.es_version <- stringr::str_split(p$version$number, "\\.")[[1]] %>% as.list()
+            private$.es_version <- stringr::str_split(p$version$number, "\\.")[[1]] %>% as.integer() %>% as.list()
             names(private$.es_version) <- c("major", "minor", "patch")
         },
-
 
         metadata_type = function(metadata_type, index_name){
             if(!purrr::is_character(metadata_type)) stop(private$err_param_type_character("metadata_type"))
             if(length(metadata_type) > 1) stop(private$err_one_value("metadata_type"))
             if(!is.null(index_name) && !purrr::is_character(index_name)) stop(private$err_param_type_character("index_name", can_be_null = TRUE))
             #
-            self$metadata(index_name) %>%
-                lapply(function(x){ 
-                    x[[metadata_type]]
-                }) %>%
-                (function(x){ 
-                    if(private$is_list_empty(x)) NULL else x
-                })
+            res <- NULL
+            m <- suppressWarnings({
+                elastic::index_get(
+                    self$connection, 
+                    index = index_name,
+                    include_type_name = FALSE, 
+                    verbose = self$verbose
+                )
+            })
+            if(length(m) > 0){
+                res <- m %>%
+                    lapply(function(x){ 
+                        x[[metadata_type]]
+                    }) %>%
+                    (function(x){ 
+                        if(private$is_list_empty(x)) NULL else x
+                    })
+            }
+            if(self$quiet_results) invisible(res) else res
         },
-
 
         define_mappings = function(data){
             "Define the Elasticsearch mapping of a dataset (list subclass)."
@@ -754,7 +756,6 @@ Kibior <- R6Class(
             purrr::imap(data, map_types) %>%
                 list(properties = .)
         },
-
 
         create_mappings = function(index_name, data){
             "Add a mapping on an index based on given data."
@@ -824,7 +825,6 @@ Kibior <- R6Class(
             res
         },
 
-
         force_merge = function(index_name, max_num_segments = NULL, only_expunge_deletes = FALSE, flush = TRUE){
             "TODO desc"
 
@@ -835,7 +835,6 @@ Kibior <- R6Class(
                                       only_expunge_deletes = only_expunge_deletes, 
                                       flush = flush)
         },
-
 
         optimize = function(index_name, max_num_segments = NULL, only_expunge_deletes = FALSE, flush = TRUE, wait_for_merge = TRUE){
             "TODO desc"
@@ -849,7 +848,6 @@ Kibior <- R6Class(
                                         wait_for_merge = wait_for_merge)
             } 
         },
-
 
         is_search_pattern = function(pattern){
             "Tell if a given string vector contains an Elasticsearch pattern string"
@@ -1752,44 +1750,6 @@ Kibior <- R6Class(
         # --------------------------------------------------------------------------
 
         #' @details
-        #' Get metadata of indices
-        #'
-        #' @family crud-metadata
-        #'
-        #' @examples
-        #' # push test data, without magrittr
-        #' kc$push(dplyr::starwars, "sw")
-        #' kc$push(dplyr::filter(dplyr::starwars, homeworld == "Naboo"), "sw_naboo")
-        #' kc$push(dplyr::filter(dplyr::starwars, homeworld == "Tatooine"), "sw_tatooine")
-        #' kc$push(dplyr::filter(dplyr::starwars, homeworld == "Alderaan"), "sw_alderaan")
-        #' # metadata
-        #' kc$metadata()
-        #' kc$metadata("sw")
-        #' kc$metadata(c("sw", "sw_naboo"))
-        #'
-        #' @param index_name a vector of index names to get metadata (default: NULL).
-        #'
-        #' @return the list of indices, each containing the 3 features (mappings,settings, aliases) 
-        #'
-        metadata = function(index_name){
-            if(missing(index_name) || purrr::is_null(index_name)) index_name <- "_all"
-            if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name", can_be_null = TRUE))
-            res <- NULL
-            m <- suppressWarnings({
-                elastic::index_get(
-                    self$connection, 
-                    index = index_name,
-                    include_type_name = FALSE, 
-                    verbose = self$verbose
-                )
-            })
-            if(length(m) > 0){
-                res <- m
-            }
-            if(self$quiet_results) invisible(res) else res
-        },
-
-        #' @details
         #' Get mappings of indices
         #'
         #' @family crud-metadata
@@ -1856,305 +1816,6 @@ Kibior <- R6Class(
             res <- private$metadata_type("aliases", index_name)
             if(self$quiet_results) invisible(res) else res
         },
-
-        #' @details
-        #' Count observations or variables in Elasticsearch data
-        #'
-        #' @family crud-metadata
-        #'
-        #' @examples
-        #' # Number of observations (nb of records) in "sw"
-        #' kc$count("sw")
-        #' # Number of observations in indices "sw_naboo" and "sw_tatooine"
-        #' kc$count(c("sw_naboo", "sw_tatooine"))
-        #' # Number of variables (nb of columns) in index "sw_naboo"
-        #' kc$count("sw_naboo", type = "variables")
-        #'
-        #' @param index_name a vector of index names to get aliases.
-        #' @param type a string representing the type to count: "observations" (lines) or 
-        #'  "variables" (columns) (default: "observations").
-        #' @param query a string as a query string syntax (default: NULL).
-        #'
-        #' @return the list of indices, containing their number of observations or variables. 
-        #'  Use `$dim()` for both
-        #'
-        count = function(index_name, type = "observations", query = NULL){
-            if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
-            if(length(type) > 1) stop(private$err_one_value("type"))
-            if(!(type %in% private$.VALID_COUNT_TYPES)) stop(private$err_not_in_vector("Count type", private$.VALID_COUNT_TYPES))
-            if(!purrr::is_null(query)){
-                if(!purrr::is_character(query)) stop(private$err_param_type_character("query"))
-                if(length(query) > 1) stop(private$err_one_value("query"))
-            }
-            #
-            involved_indices <- self$match(index_name)
-            # 
-            res <- list()
-            if(!purrr::is_null(involved_indices)){
-                for(i in involved_indices){
-                    res[[i]] <- switch(type,
-                        "observations" = {
-                            elastic::count(self$connection, index = i, q = query)
-                        },
-                        "variables" = {
-                            suppressMessages(self$columns(i)[[i]]) %>% length()
-                        },
-                        stop(private$ERR_WTF, " Found type: ", type)
-                    )
-                }
-            }
-            if(length(res) == 0){
-                res <- NULL
-            }
-            if(self$quiet_results) invisible(res) else res
-        },
-
-        #' @details
-        #' Get the average value of a column.
-        #' 
-        #' @family crud-metadata
-        #'
-        #' @examples
-        #' # Avg of "sw" column "height"
-        #' kc$avg("sw", "height")
-        #' # if pattern
-        #' kc$avg("s*", "height")
-        #' # multiple indices, multiple columns
-        #' kc$avg(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
-        #'
-        #' @param index_name a vector of index names.
-        #' @param columns a vector of column names.
-        #' @param query a string as a query string syntax (default: NULL).
-        #'
-        #' @return a tibble with avg, one line by matching index and column.
-        #'
-        avg = function(index_name, columns, query = NULL){
-            private$single_value_metric_aggregation("avg", index_name, columns, query = query)
-        },
-
-        #' @details
-        #' Get the mean value of a column.
-        #' 
-        #' @family crud-metadata
-        #'
-        #' @examples
-        #' # mean of "sw" column "height"
-        #' kc$mean("sw", "height")
-        #' # if pattern
-        #' kc$mean("s*", "height")
-        #' # multiple indices, multiple columns
-        #' kc$mean(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
-        #'
-        #' @param index_name a vector of index names.
-        #' @param columns a vector of column names.
-        #' @param query a string as a query string syntax (default: NULL).
-        #'
-        #' @return a tibble with mean, one line by matching index and column.
-        #'
-        mean = function(index_name, columns, query = NULL){
-            args <- list(index_name, columns, query = query)
-            tmp <- dplyr::inner_join(
-                do.call(self$min, args), 
-                do.call(self$max, args), 
-                by = c("column", "index")
-            )
-            tmp$mean <- ((tmp$min + tmp$max)/2)
-            tmp[c("index", "column", "mean")]
-        },
-
-        #' @details
-        #' Get the minimum value of a column.
-        #' 
-        #' @family crud-metadata
-        #'
-        #' @examples
-        #' # min of "sw" column "height"
-        #' kc$min("sw", "height")
-        #' # if pattern
-        #' kc$min("s*", "height")
-        #' # multiple indices, multiple columns
-        #' kc$min(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
-        #'
-        #' @param index_name a vector of index names.
-        #' @param columns a vector of column names.
-        #' @param query a string as a query string syntax (default: NULL).
-        #'
-        #' @return a tibble with min, one line by matching index and column.
-        #'
-        min = function(index_name, columns, query = NULL){
-            private$single_value_metric_aggregation("min", index_name, columns, query = query)
-        },
-
-        #' @details
-        #' Get the maximum value of a column.
-        #'
-        #' @family crud-metadata
-        #'
-        #' @examples
-        #' # max of "sw" column "height"
-        #' kc$max("sw", "height")
-        #' # if pattern
-        #' kc$max("s*", "height")
-        #' # multiple indices, multiple columns
-        #' kc$max(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
-        #'
-        #' @param index_name a vector of index names.
-        #' @param columns a vector of column names.
-        #' @param query a string as a query string syntax (default: NULL).
-        #'
-        #' @return a tibble with max, one line by matching index and column.
-        #'
-        max = function(index_name, columns, query = NULL){
-            private$single_value_metric_aggregation("max", index_name, columns, query = query)
-        },
-
-        #' @details
-        #' Get the sum of a column.
-        #'
-        #' @family crud-metadata
-        #'
-        #' @examples
-        #' # sum of "sw" column "height"
-        #' kc$sum("sw", "height")
-        #' # if pattern
-        #' kc$sum("s*", "height")
-        #' # multiple indices, multiple columns
-        #' kc$sum(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
-        #'
-        #' @param index_name a vector of index names.
-        #' @param columns a vector of column names.
-        #' @param query a string as a query string syntax (default: NULL).
-        #'
-        #' @return a tibble with sum, one line by matching index and column.
-        #'
-        sum = function(index_name, columns, query = NULL){
-            private$single_value_metric_aggregation("sum", index_name, columns, query = query)
-        },
-
-
-        #' @details
-        #' Produces descriptive statistics of a column.
-        #' Returns a tibble composed of: count, min, max, avg, sum, 
-        #'  sum_of_squares, variance, std_deviation (+ upper and lower bounds).
-        #' Multiple warnings here. One for the count and one for the std_dev.
-        #' 1/ Counts: they are approximate, see vignette.
-        #' 2/ Std dev: as stated in ES documentation: "The standard deviation 
-        #' and its bounds are displayed by default, but they are not always 
-        #' applicable to all data-sets. Your data must be normally distributed 
-        #' for the metrics to make sense. The statistics behind standard 
-        #' deviations assumes normally distributed data, so if your data is 
-        #' skewed heavily left or right, the value returned will be misleading."
-        #'
-        #' @family crud-metadata
-        #'
-        #' @examples
-        #' # Stats of "sw" column "height"
-        #' kc$stats("sw", "height")
-        #' # if pattern
-        #' kc$stats("s*", "height")
-        #' # multiple indices and sigma definition
-        #' kc$stats(c("sw", "sw2"), "height", sigma = 2.5)
-        #' # multiple indices, multiple columns
-        #' kc$stats(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
-        #'
-        #' @param index_name a vector of index names.
-        #' @param columns a vector of column names.
-        #' @param sigma  (default: NULL).
-        #' @param query a string as a query string syntax (default: NULL).
-        #'
-        #' @return a tibble with descriptive stats, one line by matching index.
-        #'
-        #' @seealso you should use \code{\link{count}} for more accurate count.
-        #'
-        stats = function(index_name, columns, sigma = NULL, query = NULL){
-            if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
-            if(!purrr::is_character(columns)) stop(private$err_param_type_character("columns"))
-            if(!purrr::is_null(sigma)){
-                if(length(sigma) > 1) stop(private$err_one_value("sigma"))
-                if(!is.numeric(sigma)) stop(private$err_param_type_numeric("sigma"))
-                if(sigma <= 0) stop(private$err_param_positive("sigma", zero_valid = FALSE))
-                if(self$verbose) message(" -> Using sigma: ", sigma)
-            }
-            if(!purrr::is_null(query)){
-                if(!purrr::is_character(query)) stop(private$err_param_type_character("query"))
-                if(length(query) > 1) stop(private$err_one_value("query"))
-            }
-            #
-            test_function <- function(e){ e$count == 0 }
-            supp_args <- if(purrr::is_null(sigma)) "" else paste0(',"sigma":', sigma)
-            #
-            private$multi_value_metric_aggregation("extended_stats", index_name, columns, 
-                                                    function_test_null_result = test_function, 
-                                                    aggregation_supplementary_args = supp_args, 
-                                                    query = query)
-        },
-
-        # https://www.elastic.co/guide/en/elasticsearch/reference/6.8/search-aggregations-metrics-percentile-aggregation.html#search-aggregations-metrics-percentile-aggregation-approximation
-        percentiles = function(index_name, columns, percents = NULL, query = NULL){
-            if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
-            if(!purrr::is_character(columns)) stop(private$err_param_type_character("columns"))
-            if(!purrr::is_null(percents)){
-                if(!is.numeric(percents)) stop(private$err_param_type_numeric("percents"))
-                if(any(percents <= 0)) stop(private$err_param_positive("percents", zero_valid = FALSE))
-            } else {
-                percents <- c(25, 50, 75)
-            }
-            if(self$verbose){ 
-                percents %>% 
-                    private$vector_to_str() %>% 
-                    message(" -> Using percentiles: ", .)
-            }
-            if(!purrr::is_null(query)){
-                if(!purrr::is_character(query)) stop(private$err_param_type_character("query"))
-                if(length(query) > 1) stop(private$err_one_value("query"))
-            }
-            #
-            test_function <- function(e){
-                e %>% 
-                    lapply(function(m) purrr::is_null(m)) %>% 
-                    unlist(use.names = FALSE) %>% 
-                    any()
-            }
-            supp_args <- percents %>% paste0(collapse = ",") %>% paste0(',"percents":[', ., ']')
-            #
-            private$multi_value_metric_aggregation("percentiles", index_name, columns, 
-                                                    function_test_null_result = test_function, 
-                                                    aggregation_supplementary_args = supp_args, 
-                                                    query = query)
-        },
-
-        q1 = function(index_name, columns, query = NULL){
-            self$percentiles(index_name, columns, percents = 25, query = query)
-        },
-
-        q2 = function(index_name, columns, query = NULL){
-            self$percentiles(index_name, columns, percents = 50, query = query)
-        },
-
-        q3 = function(index_name, columns, query = NULL){
-            self$percentiles(index_name, columns, percents = 75, query = query)
-        },
-
-        median = function(index_name, columns, query = NULL){
-            self$q2(index_name, columns, query = query)
-        },
-
-        summary = function(index_name, columns, query = NULL){
-            args <- list(index_name, columns, query = query)
-            chain <- function(df, func){
-                dplyr::inner_join(
-                    df, do.call(func, args), 
-                    by = c("column", "index")
-                )
-            }
-            do.call(self$min, args) %>% 
-                chain(self$q1) %>%
-                chain(self$median) %>%
-                chain(self$mean) %>%
-                chain(self$q3) %>%
-                chain(self$max)
-        },
-
 
         #' @details
         #' Shortcut to `$count()` to match the classical `dim()` function pattern `[line col]`
@@ -2231,6 +1892,453 @@ Kibior <- R6Class(
             if(self$quiet_results) invisible(res) else res
         },
 
+
+        # --------------------------------------------------------------------------
+        # methods - Stats
+        # --------------------------------------------------------------------------
+
+
+        #' @details
+        #' Count observations or variables in Elasticsearch data
+        #'
+        #' @family stats
+        #'
+        #' @examples
+        #' # Number of observations (nb of records) in "sw"
+        #' kc$count("sw")
+        #' # Number of observations in indices "sw_naboo" and "sw_tatooine"
+        #' kc$count(c("sw_naboo", "sw_tatooine"))
+        #' # Number of variables (nb of columns) in index "sw_naboo"
+        #' kc$count("sw_naboo", type = "variables")
+        #'
+        #' @param index_name a vector of index names to get aliases.
+        #' @param type a string representing the type to count: "observations" (lines) or 
+        #'  "variables" (columns) (default: "observations").
+        #' @param query a string as a query string syntax (default: NULL).
+        #'
+        #' @return the list of indices, containing their number of observations or variables. 
+        #'  Use `$dim()` for both
+        #'
+        count = function(index_name, type = "observations", query = NULL){
+            if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
+            if(length(type) > 1) stop(private$err_one_value("type"))
+            if(!(type %in% private$.VALID_COUNT_TYPES)) stop(private$err_not_in_vector("Count type", private$.VALID_COUNT_TYPES))
+            if(!purrr::is_null(query)){
+                if(!purrr::is_character(query)) stop(private$err_param_type_character("query"))
+                if(length(query) > 1) stop(private$err_one_value("query"))
+            }
+            #
+            involved_indices <- self$match(index_name)
+            # 
+            res <- list()
+            if(!purrr::is_null(involved_indices)){
+                for(i in involved_indices){
+                    res[[i]] <- switch(type,
+                        "observations" = {
+                            elastic::count(self$connection, index = i, q = query)
+                        },
+                        "variables" = {
+                            suppressMessages(self$columns(i)[[i]]) %>% length()
+                        },
+                        stop(private$ERR_WTF, " Found type: ", type)
+                    )
+                }
+            }
+            if(length(res) == 0){
+                res <- NULL
+            }
+            if(self$quiet_results) invisible(res) else res
+        },
+
+        #' @details
+        #' Get the average of numeric columns.
+        #' 
+        #' @family stats
+        #'
+        #' @examples
+        #' # Avg of "sw" column "height"
+        #' kc$avg("sw", "height")
+        #' # if pattern
+        #' kc$avg("s*", "height")
+        #' # multiple indices, multiple columns
+        #' kc$avg(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+        #'
+        #' @param index_name a vector of index names.
+        #' @param columns a vector of column names.
+        #' @param query a string as a query string syntax (default: NULL).
+        #'
+        #' @return a tibble with avg, one line by matching index and column.
+        #'
+        avg = function(index_name, columns, query = NULL){
+            private$single_value_metric_aggregation("avg", index_name, columns, query = query)
+        },
+
+        #' @details
+        #' Get the mean of numeric columns.
+        #' 
+        #' @family stats
+        #'
+        #' @examples
+        #' # mean of "sw" column "height"
+        #' kc$mean("sw", "height")
+        #' # if pattern
+        #' kc$mean("s*", "height")
+        #' # multiple indices, multiple columns
+        #' kc$mean(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+        #'
+        #' @param index_name a vector of index names.
+        #' @param columns a vector of column names.
+        #' @param query a string as a query string syntax (default: NULL).
+        #'
+        #' @return a tibble with mean, one line by matching index and column.
+        #'
+        mean = function(index_name, columns, query = NULL){
+            args <- list(index_name, columns, query = query)
+            mini <- do.call(self$min, args)
+            maxi <- do.call(self$max, args)
+            # for each index
+            purrr::imap(mini, function(x,y){
+                # add maxi to mini
+                tmp <- dplyr::inner_join(x, maxi[[y]], by = c("column"))
+                # compute mean
+                tmp$mean <- ((tmp$min + tmp$max)/2)
+                tmp[c("column", "mean")]
+            })
+        },
+
+        #' @details
+        #' Get the minimum of numeric columns.
+        #' 
+        #' @family stats
+        #'
+        #' @examples
+        #' # min of "sw" column "height"
+        #' kc$min("sw", "height")
+        #' # if pattern
+        #' kc$min("s*", "height")
+        #' # multiple indices, multiple columns
+        #' kc$min(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+        #'
+        #' @param index_name a vector of index names.
+        #' @param columns a vector of column names.
+        #' @param query a string as a query string syntax (default: NULL).
+        #'
+        #' @return a tibble with min, one line by matching index and column.
+        #'
+        min = function(index_name, columns, query = NULL){
+            private$single_value_metric_aggregation("min", index_name, columns, query = query)
+        },
+
+        #' @details
+        #' Get the maximum of numeric columns.
+        #'
+        #' @family stats
+        #'
+        #' @examples
+        #' # max of "sw" column "height"
+        #' kc$max("sw", "height")
+        #' # if pattern
+        #' kc$max("s*", "height")
+        #' # multiple indices, multiple columns
+        #' kc$max(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+        #'
+        #' @param index_name a vector of index names.
+        #' @param columns a vector of column names.
+        #' @param query a string as a query string syntax (default: NULL).
+        #'
+        #' @return a tibble with max, one line by matching index and column.
+        #'
+        max = function(index_name, columns, query = NULL){
+            private$single_value_metric_aggregation("max", index_name, columns, query = query)
+        },
+
+        #' @details
+        #' Get the sum of numeric columns.
+        #'
+        #' @family stats
+        #'
+        #' @examples
+        #' # sum of "sw" column "height"
+        #' kc$sum("sw", "height")
+        #' # if pattern
+        #' kc$sum("s*", "height")
+        #' # multiple indices, multiple columns
+        #' kc$sum(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+        #'
+        #' @param index_name a vector of index names.
+        #' @param columns a vector of column names.
+        #' @param query a string as a query string syntax (default: NULL).
+        #'
+        #' @return a tibble with sum, one line by matching index and column.
+        #'
+        sum = function(index_name, columns, query = NULL){
+            private$single_value_metric_aggregation("sum", index_name, columns, query = query)
+        },
+
+        #' @details
+        #' Produces descriptive statistics of a column.
+        #' Returns a tibble composed of: count, min, max, avg, sum, 
+        #'  sum_of_squares, variance, std_deviation (+ upper and lower bounds).
+        #' Multiple warnings here. One for the count and one for the std_dev.
+        #' 1/ Counts: they are approximate, see vignette.
+        #' 2/ Std dev: as stated in ES documentation: "The standard deviation 
+        #' and its bounds are displayed by default, but they are not always 
+        #' applicable to all data-sets. Your data must be normally distributed 
+        #' for the metrics to make sense. The statistics behind standard 
+        #' deviations assumes normally distributed data, so if your data is 
+        #' skewed heavily left or right, the value returned will be misleading."
+        #'
+        #' @family stats
+        #'
+        #' @examples
+        #' # Stats of "sw" column "height"
+        #' kc$stats("sw", "height")
+        #' # if pattern
+        #' kc$stats("s*", "height")
+        #' # multiple indices and sigma definition
+        #' kc$stats(c("sw", "sw2"), "height", sigma = 2.5)
+        #' # multiple indices, multiple columns
+        #' kc$stats(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+        #'
+        #' @param index_name a vector of index names.
+        #' @param columns a vector of column names.
+        #' @param sigma  (default: NULL).
+        #' @param query a string as a query string syntax (default: NULL).
+        #'
+        #' @return a tibble with descriptive stats, one line by matching index.
+        #'
+        #' @seealso you should use \code{\link{count}} for more accurate count.
+        #'
+        stats = function(index_name, columns, sigma = NULL, query = NULL){
+            if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
+            if(!purrr::is_character(columns)) stop(private$err_param_type_character("columns"))
+            if(!purrr::is_null(sigma)){
+                if(length(sigma) > 1) stop(private$err_one_value("sigma"))
+                if(!is.numeric(sigma)) stop(private$err_param_type_numeric("sigma"))
+                if(sigma <= 0) stop(private$err_param_positive("sigma", zero_valid = FALSE))
+                if(self$verbose) message(" -> Using sigma: ", sigma)
+            }
+            if(!purrr::is_null(query)){
+                if(!purrr::is_character(query)) stop(private$err_param_type_character("query"))
+                if(length(query) > 1) stop(private$err_one_value("query"))
+            }
+            #
+            test_function <- function(e){ e$count == 0 }
+            supp_args <- if(purrr::is_null(sigma)) "" else paste0(',"sigma":', sigma)
+            #
+            private$multi_value_metric_aggregation("extended_stats", index_name, columns, 
+                                                    function_test_null_result = test_function, 
+                                                    aggregation_supplementary_args = supp_args, 
+                                                    query = query)
+        },
+
+        #' @details
+        #' Get percentiles of numeric columns.
+        #'
+        #' @family stats
+        #'
+        #' @examples
+        #' # percentiles of "sw" column "height", default is with q1, q2 and q3
+        #' kc$percentiles("sw", "height")
+        #' # if pattern
+        #' kc$percentiles("s*", "height")
+        #' # defining percents to get
+        #' kc$percentiles("s*", "height", percents = c(20, 25))
+        #' # multiple indices, multiple columns
+        #' kc$percentiles(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+        #'
+        #' @param index_name a vector of index names.
+        #' @param columns a vector of column names.
+        #' @param percents a numeric vector of pecents to use (default: NULL).
+        #' @param query a string as a query string syntax (default: NULL).
+        #'
+        #' @return a list of tibble, splitted by indices with percentiles inside tibble columns.
+        #'
+        # https://www.elastic.co/guide/en/elasticsearch/reference/6.8/search-aggregations-metrics-percentile-aggregation.html#search-aggregations-metrics-percentile-aggregation-approximation
+        percentiles = function(index_name, columns, percents = NULL, query = NULL){
+            if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
+            if(!purrr::is_character(columns)) stop(private$err_param_type_character("columns"))
+            if(!purrr::is_null(percents)){
+                if(!is.numeric(percents)) stop(private$err_param_type_numeric("percents"))
+                if(any(percents <= 0)) stop(private$err_param_positive("percents", zero_valid = FALSE))
+                if(any(percents > 100)) stop("percents cannot be > 100")
+            } else {
+                percents <- c(25, 50, 75)
+            }
+            if(self$verbose){ 
+                percents %>% 
+                    private$vector_to_str() %>% 
+                    message(" -> Using percentiles: ", .)
+            }
+            if(!purrr::is_null(query)){
+                if(!purrr::is_character(query)) stop(private$err_param_type_character("query"))
+                if(length(query) > 1) stop(private$err_one_value("query"))
+            }
+            #
+            test_function <- function(e){
+                e %>% 
+                    lapply(function(m) purrr::is_null(m)) %>% 
+                    unlist(use.names = FALSE) %>% 
+                    any()
+            }
+            supp_args <- percents %>% paste0(collapse = ",") %>% paste0(',"percents":[', ., ']')
+            #
+            private$multi_value_metric_aggregation("percentiles", index_name, columns, 
+                                                    function_test_null_result = test_function, 
+                                                    aggregation_supplementary_args = supp_args, 
+                                                    query = query)
+        },
+
+        #' @details
+        #' Get Q1 percentiles from numeric columns.
+        #'
+        #' @family stats
+        #'
+        #' @examples
+        #' # Q1 of "sw" column "height"
+        #' kc$q1("sw", "height")
+        #' # if pattern
+        #' kc$q1("s*", "height")
+        #' # multiple indices, multiple columns
+        #' kc$q1(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+        #'
+        #' @param index_name a vector of index names.
+        #' @param columns a vector of column names.
+        #' @param query a string as a query string syntax (default: NULL).
+        #'
+        #' @return a list of tibble, splitted by indices with Q1 inside tibble columns.
+        #'
+        q1 = function(index_name, columns, query = NULL){
+            self$percentiles(index_name, columns, percents = 25, query = query)
+        },
+
+        #' @details
+        #' Get Q2 percentiles from numeric columns.
+        #'
+        #' @family stats
+        #'
+        #' @examples
+        #' # Q2 of "sw" column "height"
+        #' kc$q2("sw", "height")
+        #' # if pattern
+        #' kc$q2("s*", "height")
+        #' # multiple indices, multiple columns
+        #' kc$q2(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+        #'
+        #' @param index_name a vector of index names.
+        #' @param columns a vector of column names.
+        #' @param query a string as a query string syntax (default: NULL).
+        #'
+        #' @return a list of tibble, splitted by indices with Q2 inside tibble columns.
+        #'
+        q2 = function(index_name, columns, query = NULL){
+            self$percentiles(index_name, columns, percents = 50, query = query)
+        },
+
+        #' @details
+        #' Get median from numeric columns.
+        #' Basically a wrapper around `$q2()`.
+        #'
+        #' @family stats
+        #'
+        #' @examples
+        #' # median of "sw" column "height"
+        #' kc$median("sw", "height")
+        #' # if pattern
+        #' kc$median("s*", "height")
+        #' # multiple indices, multiple columns
+        #' kc$median(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+        #'
+        #' @param index_name a vector of index names.
+        #' @param columns a vector of column names.
+        #' @param query a string as a query string syntax (default: NULL).
+        #'
+        #' @return a list of tibble, splitted by indices with median inside tibble columns.
+        #'
+        median = function(index_name, columns, query = NULL){
+            self$q2(index_name, columns, query = query)
+        },
+
+        #' @details
+        #' Get Q3 percentiles from numeric columns.
+        #'
+        #' @family stats
+        #'
+        #' @examples
+        #' # Q3 of "sw" column "height"
+        #' kc$q3("sw", "height")
+        #' # if pattern
+        #' kc$q3("s*", "height")
+        #' # multiple indices, multiple columns
+        #' kc$q3(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+        #'
+        #' @param index_name a vector of index names.
+        #' @param columns a vector of column names.
+        #' @param query a string as a query string syntax (default: NULL).
+        #'
+        #' @return a list of tibble, splitted by indices with Q3 inside tibble columns.
+        #'
+        q3 = function(index_name, columns, query = NULL){
+            self$percentiles(index_name, columns, percents = 75, query = query)
+        },
+
+        #' @details
+        #' Summary for numeric columns.
+        #' Cumulates `$min()`, `$max()`, `$q1()`, `$q2()`, `$q3()`.
+        #'
+        #' @family stats
+        #'
+        #' @examples
+        #' # summary of "sw" column "height"
+        #' kc$summary("sw", "height")
+        #' # if pattern
+        #' kc$summary("s*", "height")
+        #' # multiple indices, multiple columns
+        #' kc$summary(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+        #'
+        #' @param index_name a vector of index names.
+        #' @param columns a vector of column names.
+        #' @param query a string as a query string syntax (default: NULL).
+        #'
+        #' @return a list of tibble, splitted by indices.
+        #'
+        summary = function(index_name, columns, query = NULL){
+            if(!purrr::is_null(query)){
+                if(!purrr::is_character(query)) stop(private$err_param_type_character("query"))
+                if(length(query) > 1) stop(private$err_one_value("query"))
+            }
+            if(all(self$version$major >= 7, self$version$minor >= 8)){
+                if(self$verbose) message(" -> ES >= 7.8.0, boxplot endpoint available")
+                # use boxplot endpoint
+                # https://www.elastic.co/guide/en/elasticsearch/reference/current/search-aggregations-metrics-boxplot-aggregation.html#search-aggregations-metrics-boxplot-aggregation-approximation
+                #
+                test_function <- function(e){
+                    e %>% 
+                        (function(m) purrr::is_null(m$min)) %>% 
+                        unlist(use.names = FALSE) %>% 
+                        any()
+                }
+                #
+                private$multi_value_metric_aggregation("boxplot", index_name, columns, 
+                                                        function_test_null_result = test_function,
+                                                        query = query)
+            } else {
+                # classical way
+                if(self$verbose) message(" -> ES < 7.8.0, boxplot endpoint not available")
+                args <- list(index_name, columns, query = query)
+                chain <- function(ldf, func){
+                    fres <- suppressMessages({ do.call(func, args) })
+                    purrr::imap(ldf, function(x,y){
+                        dplyr::inner_join(x, fres[[y]], by = c("column"))
+                    })
+                }
+                do.call(self$min, args) %>% 
+                    chain(self$max) %>%
+                    chain(self$q1) %>%
+                    chain(self$q2) %>%
+                    chain(self$q3)
+            }
+        },
 
 
         # --------------------------------------------------------------------------
@@ -2424,7 +2532,11 @@ Kibior <- R6Class(
         #' @return a filepath.
         #'
         # TODO test
-        get_resource = function(url_or_filepath){
+        get_resource = function(url_or_filepath, fileext = NULL){
+            if(!purrr::is_null(fileext)){
+                if(!purrr::is_character(fileext)) stop(private$err_param_type_character("fileext"))
+                if(length(fileext) > 1) stop(private$err_one_value("fileext"))
+            } 
             if(file.exists(url_or_filepath)){
                 # file exists
                 url_or_filepath
@@ -2433,7 +2545,7 @@ Kibior <- R6Class(
                 if(self$verbose) message("Filepath does not exist locally, trying download...")
                 tryCatch(
                     expr = {
-                        f <- tempfile()
+                        f <- tempfile(fileext = fileext)
                         download.file(url_or_filepath, f)
                         f
                     },
@@ -2516,12 +2628,12 @@ Kibior <- R6Class(
         #'
         #' @return data contained in the file as a tibble, or NULL.
         #'
-        import_tabular = function(filepath, to_tibble = TRUE){
+        import_tabular = function(filepath, to_tibble = TRUE, fileext = ".csv"){
             # check pkg
             Kibior$.install_packages("rio")
             # do import
             filepath %>% 
-                self$get_resource() %>%
+                self$get_resource(fileext = fileext) %>%
                 rio::import() %>%
                 (function(x){
                     if(to_tibble) self$soft_cast(x) else x
@@ -2551,10 +2663,10 @@ Kibior <- R6Class(
         #'
         #' @return data contained in the file as a tibble, or NULL.
         #'
-        import_features = function(filepath, to_tibble = TRUE){
+        import_features = function(filepath, to_tibble = TRUE, fileext = ".gtf"){
             Kibior$.install_packages("rtracklayer")
             filepath %>% 
-                self$get_resource() %>%
+                self$get_resource(fileext = fileext) %>%
                 rtracklayer::import() %>%
                 (function(x){
                     if(to_tibble) self$soft_cast(x) else x
@@ -2581,12 +2693,12 @@ Kibior <- R6Class(
         #'
         #' @return data contained in the file as a tibble, or NULL.
         #'
-        import_alignments = function(filepath, to_tibble = TRUE){
+        import_alignments = function(filepath, to_tibble = TRUE, fileext = ".bam"){
             # check pkg
             Kibior$.install_packages("Rsamtools")
             # do the job
             filepath %>%
-                self$get_resource() %>% 
+                self$get_resource(fileext = fileext) %>% 
                 Rsamtools::scanBam() %>%
                 (function(x){
                     if(to_tibble) self$soft_cast(x, caster = self$bam_to_tibble) else x
@@ -2612,11 +2724,11 @@ Kibior <- R6Class(
         #'
         #' @return data contained in the file as a tibble, dataframe or NULL.
         #'
-        import_json = function(filepath, to_tibble = TRUE){
+        import_json = function(filepath, to_tibble = TRUE, fileext = ".json"){
             # check pkg
             Kibior$.install_packages("jsonlite")
             filepath %>% 
-                self$get_resource() %>% 
+                self$get_resource(fileext = fileext) %>% 
                 jsonlite::fromJSON() %>% 
                 (function(x){
                     if(to_tibble) self$soft_cast(x) else x
@@ -3646,7 +3758,6 @@ Kibior <- R6Class(
                                     id = run_infos[[current_index]][["hits"]],
                                     source_includes = selected_fields
                                 ))
-
                                 # get data from ES (simple get)
                                 raw <- do.call(elastic::docs_get, args) %>%
                                     jsonlite::fromJSON(simplifyDataFrame = TRUE) %>%
@@ -3668,32 +3779,26 @@ Kibior <- R6Class(
                                 nb_hits <- 1
 
                             } else {
-                                
                                 # ids to req
                                 if(head && length(run_infos[[current_index]][["hits"]]) > self$head_search_size){
                                     req_ids <- head(run_infos[[current_index]][["hits"]], self$head_search_size) 
                                 } else {
                                     req_ids <- run_infos[[current_index]][["hits"]]
                                 }
-
                                 # complete args
                                 args <- c(base_args, list(
                                     index = current_index,
                                     ids = req_ids,
                                     "_source_includes" = selected_fields
                                 ))
-
                                 # get data from ES
                                 res <- do.call(elastic::docs_mget, args) %>% 
                                     jsonlite::fromJSON(simplifyDataFrame = TRUE) 
-
                                 # if the result is not empty
                                 nb_hits <- nrow(res$docs)
                                 if(nb_hits > 0){
-                                    
                                     # tidy data
                                     raw <- get_clean_bulk(res$docs)
-
                                     # combne results in one df
                                     if(length(final_df[[ current_index ]]) == 0){
                                         final_df[[ current_index ]] <- raw
@@ -3707,12 +3812,9 @@ Kibior <- R6Class(
                                                 rbind(raw, final_df[[ current_index ]])
                                             }
                                         )
-                                        
                                     }
                                 }
-
                             }
-                            
                             # update pbar
                             if(!head && !self$quiet_progress){
                                 pb_sum <- pb_sum + nb_hits
@@ -3951,7 +4053,6 @@ Kibior <- R6Class(
             res <- private$join(join_type = "anti", ...)
             if(self$quiet_results) invisible(res) else res
         }
-
     )
 )
 
@@ -3960,6 +4061,24 @@ Kibior <- R6Class(
 # Kibior static methods
 #
 
+#' 
+#' @title Static - initiate a direct instance to Kibio public repository
+#' @name Static - initiate a direct instance to Kibio public repository
+#' 
+#' @details
+#' Initiate a instance of Kibior connected to the Kibio public repository.
+#'
+#' @param verbose verbosity activation (default: FALSE)
+#'
+#' @family initiate
+#'
+#' @return a new instance of Kibior conencted to `kibio.compbio.ulaval.ca`
+#'
+Kibior$get_kibio_instance <- function(verbose = FALSE){
+    .tkci <- Kibior$new("kibio.compbio.ulaval.ca", 80, verbose = verbose)
+    message("This instance grants you anonymous connection with read-only priviledges")
+    .tkci
+}
 
 #' 
 #' @title Static - Kibior is instance
