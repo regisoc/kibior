@@ -169,6 +169,9 @@ Kibior <- R6Class(
             "json"  = "json"
         ),
 
+        # Private kibior indices metadata
+        .KIBIOR_METADATA_INDICES = ".kibior_indices",
+
 
         # --------------------------------------------------------------------------
         # methods - inherits
@@ -569,6 +572,17 @@ Kibior <- R6Class(
                 do.call(args = fargs)
         },
 
+        symmetric_difference = function(x, y){
+            "Compute a symmetric difference between two sets"
+            ""
+            "@param x the first set."
+            "@param y the second set."
+            "@return the symmetric difference"
+            sd <- dplyr::setdiff(dplyr::union(x, y), dplyr::intersect(x, y))
+            if(length(sd) == 0) sd <- NULL
+            sd
+        },
+
         round = function(nb, nb_decimal = 1L){
             "Round to a number to a given decimal number"
             ""
@@ -648,6 +662,11 @@ Kibior <- R6Class(
                 paste0("'", ., "'")
         },
 
+        df_to_line = function(df){
+            "Transform a dataframe-like structure to a list of its lines"
+            split(df, seq(nrow(df)))
+        },
+
 
         # --------------------------------------------------------------------------
         # methods - Elastic utils
@@ -675,28 +694,25 @@ Kibior <- R6Class(
             names(private$.es_version) <- c("major", "minor", "patch")
         },
 
-        metadata_type = function(metadata_type, index_name){
-            if(!purrr::is_character(metadata_type)) stop(private$err_param_type_character("metadata_type"))
-            if(length(metadata_type) > 1) stop(private$err_one_value("metadata_type"))
-            if(!is.null(index_name) && !purrr::is_character(index_name)) stop(private$err_param_type_character("index_name", can_be_null = TRUE))
+        metadata_type = function(mtype, index_name){
+            if(!purrr::is_character(mtype)) stop(private$err_param_type_character("mtype"))
+            if(length(mtype) > 1) stop(private$err_one_value("mtype"))
+            if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
             #
             res <- NULL
             m <- suppressWarnings({
                 elastic::index_get(
                     self$connection, 
                     index = index_name,
+                    features = mtype,
                     include_type_name = FALSE, 
                     verbose = self$verbose
                 )
             })
             if(length(m) > 0){
                 res <- m %>%
-                    lapply(function(x){ 
-                        x[[metadata_type]]
-                    }) %>%
-                    (function(x){ 
-                        if(private$is_list_empty(x)) NULL else x
-                    })
+                    lapply(function(x){ x[[mtype]] }) %>%
+                    (function(x){ if(private$is_list_empty(x)) NULL else x })
             }
             if(self$quiet_results) invisible(res) else res
         },
@@ -757,24 +773,15 @@ Kibior <- R6Class(
                 list(properties = .)
         },
 
-        create_mappings = function(index_name, data){
+        create_mappings = function(index_name, mapping){
             "Add a mapping on an index based on given data."
             ""
-            "@examples"
-            "kc <- Kibior$new(verbose = TRUE)"
-            "kc$create('aaa')"
-            "kc$create_mapping('aaa', starwars)"
-            ""
             "@param index_name a vector of index names."
-            "@param data a dataset."
+            "@param mapping mapping to apply."
             "@return a list of indices, each containing their number of observations and variables."
 
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
             if(length(index_name) > 1) stop(private$err_one_value("index_name"))
-            if(purrr::is_null(data) || length(data) == 0) stop(private$err_empty_data("data"))
-            #
-            if(self$verbose) message(" -> Defining mapping")
-            mapping <- private$define_mappings(data)
             # req
             if(self$verbose) message(" -> Applying mapping to '", index_name, "'")
             res <- tryCatch(
@@ -955,8 +962,7 @@ Kibior <- R6Class(
         },
        
         # Sad error is sad.
-        ERR_WTF = "Well. This is sad."
-
+        ERR_WTF = "Well. This is sad. Report with an issue please."
     ),
 
 
@@ -1376,11 +1382,10 @@ Kibior <- R6Class(
         #' @field verbose verbose mode, prints out more informations during execution
         verbose = FALSE,
 
-        #' @field quiet_progress progressbar quiet mode, remove progress bar, useful for cleaner 
-        #'  tests
+        #' @field quiet_progress progressbar quiet mode, toggles progress bar
         quiet_progress = FALSE,
 
-        #' @field quiet_results results quiet mode, make results of methods invisible
+        #' @field quiet_results results quiet mode, toggles results printing
         quiet_results = FALSE,
 
 
@@ -1709,6 +1714,250 @@ Kibior <- R6Class(
 
 
         # --------------------------------------------------------------------------
+        # methods - indices metadata CRUD
+        # --------------------------------------------------------------------------
+
+        #' @details
+        #' Add a description of a pushed dataset.
+        #'
+        #' @family kibior-metadata
+        #'
+        #' @param index_name the index name to describe
+        #' @param dataset_name the full length dataset name
+        #' @param source_name the source/website/entity full length name
+        #' @param index_description the index description, should be explicit
+        #' @param version the version of the source dataset
+        #' @param link the link to the source dataset website
+        #' @param direct_download_link the direct download url of the dataset source
+        #' @param version_date the version or build date
+        #' @param license_link the license attached to this dataset, could be a url
+        #' @param columns a list of (column_name = column_description) to register (default: list())
+        #' @param force if FALSE, raise an error if the description already exists, else TRUE to overwrite (default: FALSE)
+        #'
+        #' @return the index name if complete, else an error
+        #'
+        #' @examples
+        #' kc$add_description(
+        #'     index_name = "sw", 
+        #'     dataset_name = "starwars", 
+        #'     source_name = "Package dplyr", 
+        #'     index_description = "Description of starwars characters, the data comes from the Star Wars API.", 
+        #'     version = "dplyr (1.0.0)", 
+        #'     link = "http://swapi.dev/", 
+        #'     direct_download_link = "http://swapi.dev/", 
+        #'     version_date = "2020-05-28", 
+        #'     license_link = "MIT", 
+        #'     columns = list(
+        #'         "name" = "Name of the character",
+        #'         "height" = "Height (cm)",
+        #'         "mass" = "Weight (kg)",
+        #'         "hair_color" = "Hair colors",
+        #'         "skin_color" = "Skin colors",
+        #'         "eye_color" = "Eye colors",
+        #'         "birth_year" = "Year born (BBY = Before Battle of Yavin)",
+        #'         "sex" = "The biological sex of the character, namely male, female, hermaphroditic, or none (as in the case for Droids).",
+        #'         "gender" = "The gender role or gender identity of the character as determined by their personality or the way they were progammed (as in the case for Droids).",
+        #'         "homeworld" = "Name of homeworld",
+        #'         "species" = "Name of species",
+        #'         "films" = "List of films the character appeared in",
+        #'         "vehicles" = "List of vehicles the character has piloted",
+        #'         "starships" = "List of starships the character has piloted"
+        #'     )
+        #' )
+        #' 
+        add_description = function(index_name, dataset_name, source_name, index_description, version, link, direct_download_link, version_date, license_link, columns = list(), force = FALSE){
+            # check
+            if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
+            if(private$is_search_pattern(index_name)) stop(private$err_search_pattern_forbidden("index_name"))
+            if(length(index_name) > 1) stop(private$err_one_value("index_name"))
+            if(suppressMessages({ purrr::is_null(self$match(index_name)) })) stop("push an index before describing it please")
+            if(!purrr::is_character(dataset_name)) stop(private$err_param_type_character("dataset_name"))
+            if(length(dataset_name) > 1) stop(private$err_one_value("dataset_name"))
+            if(!purrr::is_character(source_name)) stop(private$err_param_type_character("source_name"))
+            if(length(source_name) > 1) stop(private$err_one_value("source_name"))
+            if(!purrr::is_character(index_description)) stop(private$err_param_type_character("index_description"))
+            if(length(index_description) > 1) stop(private$err_one_value("index_description"))
+            if(!purrr::is_character(version)) stop(private$err_param_type_character("version"))
+            if(length(version) > 1) stop(private$err_one_value("version"))
+            if(!purrr::is_character(link)) stop(private$err_param_type_character("link"))
+            if(length(link) > 1) stop(private$err_one_value("link"))
+            if(!purrr::is_character(direct_download_link)) stop(private$err_param_type_character("direct_download_link"))
+            if(length(direct_download_link) > 1) stop(private$err_one_value("direct_download_link"))
+            if(!purrr::is_character(version_date)) stop(private$err_param_type_character("version_date"))
+            if(length(version_date) > 1) stop(private$err_one_value("version_date"))
+            if(!purrr::is_character(license_link)) stop(private$err_param_type_character("license_link"))
+            if(length(license_link) > 1) stop(private$err_one_value("license_link"))
+            if(!purrr::is_logical(force)) stop(private$err_param_type_logical("force"))
+            if(is.na(force)) stop(private$err_logical_na("force"))
+            # check cols
+            if(!purrr::is_list(columns) || private$is_list_empty(columns)){
+                stop("argument 'columns' must be a list, with the column name as key and column description as value")
+            }
+            actual_cols <- suppressMessages({ self$columns(index_name)[[index_name]] }) %>% 
+                (function(x) x[x != self$default_id_col])
+            if(length(actual_cols) != length(columns)) stop("argument 'columns' must have the same number of columns as in its index")
+            sd <- private$symmetric_difference(actual_cols, names(columns))
+            if(!purrr::is_null(sd)){
+                sd %>% 
+                    private$vector_to_str() %>% 
+                    stop("argument 'columns' has some undocumented or unknown column names ", .)
+            }
+            if(length(unlist(columns, use.names = FALSE)) != length(columns)) stop("argument 'columns' must not accept list type in values")
+            has_non_str_type <- columns %>% 
+                lapply(typeof) %>% 
+                unlist(use.names = FALSE) %>% 
+                {. != "character"} %>% 
+                any()
+            if(has_non_str_type) stop("argument 'columns' must only have character type in values")
+            # get actual data
+            if(self$verbose) message(" -> Getting actual descriptions")
+            data <- suppressMessages({ 
+                self$pull(private$.KIBIOR_METADATA_INDICES)[[private$.KIBIOR_METADATA_INDICES]]
+            })
+            if(index_name %in% data$index_name){
+                if(!force){
+                    stop("index '", index_name ,"' description is already registered. Use 'force' to overwrite.")
+                } else {
+                    if(self$verbose) message(" -> Cleaning old description of '", index_name, "'")
+                    data <- dplyr::filter(data, index_name != index_name)
+                    print(data)
+                }
+            }
+            #
+            if(self$verbose) message(" -> Formatting new description for '", index_name, "'")
+            meta_index <- list(
+                index_name = index_name, 
+                dataset_name = dataset_name, 
+                source_name = source_name, 
+                index_description = index_description, 
+                version = version, 
+                link = link, 
+                direct_download_link = direct_download_link, 
+                version_date = version_date, 
+                license_link = license_link
+            ) %>% as.data.frame(stringsAsFactors = FALSE)
+            #
+            new_data <- columns %>% 
+                purrr::imap(function(col_desc, col_name){ 
+                    list(
+                        index_name = index_name,
+                        column_name = col_name,
+                        column_description = col_desc
+                    )
+                }) %>% 
+                data.table::rbindlist() %>%
+                as.data.frame(stringsAsFactors = FALSE) %>% 
+                dplyr::inner_join(meta_index, by = "index_name")
+            # 
+            if(self$verbose) message(" -> Pushing new description for '", index_name, "'")
+            res <- suppressMessages({
+                data %>% 
+                    (function(d){
+                        if(purrr::is_null(d)){
+                            new_data 
+                        } else {
+                            d %>% 
+                                dplyr::select(-c(self$default_id_col)) %>% 
+                                rbind(new_data)
+                        }
+                    }) %>% 
+                    self$push(private$.KIBIOR_METADATA_INDICES, mode = "recreate") 
+            })
+            # 
+            if(self$quiet_results) invisible(index_name) else index_name
+        },
+
+        #' @details
+        #' Get the description of indices and their columns.
+        #'
+        #' @family kibior-metadata
+        #'
+        #' @param index_name the index name to describe
+        #' @param columns a vector of column names to describe (default: NULL)
+        #' @param pretty prints out a pretty description (default: FALSE)
+        #'
+        #' @return all description, grouped by indices
+        #'
+        #' @examples
+        #' kc$describe("s*")
+        #' kc$describe("sw", columns = c("name", "height"))
+        #' 
+        describe = function(index_name, columns = NULL){
+            # check
+            if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
+            if(!purrr::is_null(columns) && !purrr::is_character(columns)){
+                stop(private$err_param_type_character("columns", can_be_null = TRUE))
+            }
+            if(!purrr::is_logical(pretty)) stop(private$err_param_type_logical("pretty"))
+            if(is.na(pretty)) stop(private$err_logical_na("pretty"))
+            # check if there is any description
+            m <- suppressMessages({ self$match(index_name) })
+            if(purrr::is_null(m)){
+                if(self$verbose) message(" -> No description found for '", index_name,"'")
+                res <- NULL
+            } else {
+                # query
+                n <- private$.KIBIOR_METADATA_INDICES
+                q <- paste0("index_name:", index_name)
+                if(!purrr::is_null(columns)){
+                    q <- columns %>% 
+                        private$vector_to_str() %>% 
+                        paste0(q, " && column_name:(", ., ")")
+                }
+                if(self$verbose) message(" -> Getting actual description for '", index_name, "'")
+                tmp <- suppressMessages({
+                    self$pull(n, query = q)[[n]] %>% 
+                        dplyr::select(-c(self$default_id_col))
+                }) 
+                indices <- unique(tmp$index_name)
+                res <- indices %>% 
+                    lapply(function(n){
+                        tmp %>%
+                            dplyr::filter(index_name == n) %>%
+                            dplyr::select(-c("index_name"))
+                    })
+                names(res) <- indices
+            }
+            res
+        },
+
+        #' @details
+        #' Get the description text of indices.
+        #'
+        #' @family kibior-metadata
+        #'
+        #' @param index_name the index name to describe
+        #'
+        #' @return a list of description text, grouped by indices
+        #'
+        #' @examples
+        #' kc$describe_indices("s*")
+        #' 
+        describe_indices = function(index_name){
+            self$describe(index_name) %>% 
+                lapply(function(i) i$index_description %>% unique())
+        },
+
+        #' @details
+        #' Get the description text of index columns.
+        #'
+        #' @family kibior-metadata
+        #'
+        #' @param index_name the index name to describe
+        #' @param columns a vector of column names to describe
+        #'
+        #' @return a list of description text, grouped by indices
+        #'
+        #' @examples
+        #' kc$describe_columns("s*", c("name", "height"))
+        #' 
+        describe_columns = function(index_name, columns){
+            self$describe(index_name, columns = columns) %>% 
+                lapply(function(i) i %>% dplyr::select(column_name, column_description))
+        },
+
+
+        # --------------------------------------------------------------------------
         # methods - cluster wealth
         # --------------------------------------------------------------------------
 
@@ -1764,7 +2013,7 @@ Kibior <- R6Class(
         #' @return the list of indices, containing their mapping
         #'
         mappings = function(index_name){
-            if(missing(index_name)) index_name <- NULL
+            if(missing(index_name)) index_name <- "*"
             res <- private$metadata_type("mappings", index_name)
             if(!purrr::is_null(res)){
                 # remove type call
@@ -2996,20 +3245,14 @@ Kibior <- R6Class(
             if(bulk_size < 1) stop(private$err_param_positive("bulk_size",))
             if(!(mode %in% private$.VALID_PUSH_MODES)) stop(private$err_not_in_vector("mode", private$.VALID_PUSH_MODES))
             if(length(mode) > 1) stop(private$err_one_value("mode"))
+            # check index absence/presence
+            has_index <- self$match(index_name)
             if(mode == "check"){
-                has_indices <- self$has(index_name)
-                already_there_index <- names(has_indices[has_indices == TRUE])
-                if(length(already_there_index) != 0){
-                    stop(private$err_index_already_exists(already_there_index))
-                }
+                if(index_name %in% has_index) stop(private$err_index_already_exists(already_there_index))
             }
             if(mode == "update"){
                 if(purrr::is_null(id_col)) stop("Update mode needs a unique IDs column name.")
-                has_indices <- self$has(index_name)
-                absent_indices <- names(has_indices[has_indices == FALSE])
-                if(length(absent_indices) != 0){
-                    stop(private$err_index_unknown(absent_indices))
-                }
+                if(!(index_name %in% has_index)) stop(private$err_index_unknown(absent_indices))
             }
             # -----------------------------------------
             # PREPARE DATA 
@@ -3031,7 +3274,8 @@ Kibior <- R6Class(
                 ids <- dplyr::pull(data, id_col)
                 if(length(unique(ids)) != length(ids)) stop("Column used as ID does not have unique elements.")
             } else {
-                private$err_msg <- paste0("Kibior tried to add a unique column IDs '", self$default_id_col, "', but the column name already exists. ", 
+                private$err_msg <- paste0("Kibior tried to add a unique column IDs '", 
+                    self$default_id_col, "', but the column name already exists. ", 
                     "Try to define a column with unique IDs, change the column name or define another default name with '$default_id_col'.")
                 if(self$default_id_col %in% names(data)) stop(private$err_msg)
                 # force add a column with unique id (single sequence 1:nrow)
@@ -3045,7 +3289,7 @@ Kibior <- R6Class(
             has_df_type <- data %>% 
                 lapply(class) %>% 
                 unlist(use.names = FALSE) %>% 
-                {. == "data.frame"} %>% 
+                {"data.frame" %in% .} %>% 
                 any()
             if(has_df_type){
                 if(self$verbose) message(" -> Flattening columns having sub-dataframes")
@@ -3139,7 +3383,7 @@ Kibior <- R6Class(
                         message(" -> Adapting NULL/NA to empty strings values from columns: ", .)
                 }
                 data <- data %>% 
-                    dplyr::mutate_at(dplyr::vars(list_col_names), tidyr::replace_na, "") %>% 
+                    dplyr::mutate_at(dplyr::all_of(dplyr::vars(list_col_names)), tidyr::replace_na, "") %>% 
                     tibble::as_tibble()
             }
             # -----------------------------------------
@@ -3149,11 +3393,14 @@ Kibior <- R6Class(
                 res <- self$create(index_name = index_name, force = (mode == "recreate"))
                 if(!res[[index_name]]) stop("Index '", index_name,"' not created")
                 # define mapping based on data type
+                if(self$verbose) message(" -> Defining mapping of '", index_name, "'")
+                mapping <- private$define_mappings(data)
+                #
                 err_msg <- paste0("Cannot apply mapping to '", index_name, "'")
                 mapping_res <- tryCatch(
                     expr = {
                         suppressWarnings({ 
-                            private$create_mappings(index_name = index_name, data = data)
+                            private$create_mappings(index_name, mapping)
                         })
                     }, 
                     error = function(e){
@@ -3715,6 +3962,7 @@ Kibior <- R6Class(
                 )
 
                 # progress bar init
+                pb <- NULL
                 if(!head && !self$quiet_progress){
                     cumul_threshold <- run_infos %>% 
                         lapply(function(x){ 
@@ -3722,9 +3970,11 @@ Kibior <- R6Class(
                         }) %>% 
                         unlist(use.names = FALSE) %>%
                         sum()
-                    # init pbar
-                    pb_sum <- 0
-                    pb <- txtProgressBar(min = 0, max = cumul_threshold, initial = 0, style = 3)
+                    if(cumul_threshold > 0){
+                        # init pbar
+                        pb_sum <- 0
+                        pb <- txtProgressBar(min = 0, max = cumul_threshold, initial = 0, style = 3)
+                    }
                 }
 
                 # start timers
@@ -3816,7 +4066,7 @@ Kibior <- R6Class(
                                 }
                             }
                             # update pbar
-                            if(!head && !self$quiet_progress){
+                            if(!purrr::is_null(pb)){
                                 pb_sum <- pb_sum + nb_hits
                                 setTxtProgressBar(pb, pb_sum)
                             }
@@ -3876,7 +4126,7 @@ Kibior <- R6Class(
                 }
 
                 # close progress bar
-                if(!head && !self$quiet_progress) close(pb)
+                if(!purrr::is_null(pb)) close(pb)
             }
             # return 
             if(self$quiet_results) invisible(final_df) else final_df
@@ -4088,17 +4338,14 @@ Kibior$get_kibio_instance <- function(verbose = FALSE){
 #' Tests if a given object is a Kibior instance.
 #' Basically compute symmetric difference between two sets of class.
 #'
-#' @param other an object
+#' @param obj an object
 #'
 #' @family comparison
 #'
 #' @return TRUE if the given object is an instance of Kibior, else FALSE
 #' 
-Kibior$is_instance <- function(other){
-    x <- c(Kibior$classname, "R6")
-    y <- class(other)
-    sd <- dplyr::setdiff(dplyr::union(x, y), dplyr::intersect(x, y))
-    (purrr::is_character(sd) && length(sd) == 0)
+Kibior$is_instance <- function(obj){
+    is(obj, Kibior$classname)
 }
 
 #' 
