@@ -1873,7 +1873,6 @@ Kibior <- R6Class(
         #'
         #' @param index_name the index name to describe
         #' @param columns a vector of column names to describe (default: NULL)
-        #' @param pretty prints out a pretty description (default: FALSE)
         #'
         #' @return all description, grouped by indices
         #'
@@ -1887,8 +1886,6 @@ Kibior <- R6Class(
             if(!purrr::is_null(columns) && !purrr::is_character(columns)){
                 stop(private$err_param_type_character("columns", can_be_null = TRUE))
             }
-            if(!purrr::is_logical(pretty)) stop(private$err_param_type_logical("pretty"))
-            if(is.na(pretty)) stop(private$err_logical_na("pretty"))
             # check if there is any description
             m <- suppressMessages({ self$match(index_name) })
             if(purrr::is_null(m)){
