@@ -1820,7 +1820,6 @@ Kibior <- R6Class(
                 } else {
                     if(self$verbose) message(" -> Cleaning old description of '", index_name, "'")
                     data <- dplyr::filter(data, index_name != index_name)
-                    print(data)
                 }
             }
             #
