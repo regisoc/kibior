@@ -258,7 +258,7 @@ Kibior <- R6Class(
                                 # add index and col names
                                 tmp <- list()
                                 tmp[[aggregation_type]] <- stmp
-                                tmp <- as.data.frame(tmp)
+                                tmp <- as.data.frame(tmp, stringsAsFactors = FALSE)
                                 tmp <- cbind(column = col, tmp)
                                 tmp
                             },
@@ -366,7 +366,7 @@ Kibior <- R6Class(
                                         .$kaggs
                                 if(function_test_null_result(tmp)) stop("ABSENT_COLUMN")
                                 # add index and col names
-                                tmp <- as.data.frame(tmp)
+                                tmp <- as.data.frame(tmp, stringsAsFactors = FALSE)
                                 tmp <- cbind(column = col, tmp)
                                 tmp
                             },
@@ -1727,10 +1727,13 @@ Kibior <- R6Class(
         #' @param source_name the source/website/entity full length name
         #' @param index_description the index description, should be explicit
         #' @param version the version of the source dataset
-        #' @param link the link to the source dataset website
-        #' @param direct_download_link the direct download url of the dataset source
+        #' @param change_log what have been done from the last version
+        #' @param website the website to the source dataset website
+        #' @param direct_download the direct download url of the dataset source
         #' @param version_date the version or build date
-        #' @param license_link the license attached to this dataset, could be a url
+        #' @param license the license attached to this dataset, could be a url
+        #' @param contact a mailto/contact
+        #' @param references some paper and other references (e.g. doi, url)
         #' @param columns a list of (column_name = column_description) to register (default: list())
         #' @param force if FALSE, raise an error if the description already exists, else TRUE to overwrite (default: FALSE)
         #'
@@ -1765,7 +1768,7 @@ Kibior <- R6Class(
         #'     )
         #' )
         #' 
-        add_description = function(index_name, dataset_name, source_name, index_description, version, link, direct_download_link, version_date, license_link, columns = list(), force = FALSE){
+        add_description = function(index_name, dataset_name, source_name, index_description, version, change_log, website, direct_download, version_date, license, contact, references, columns = list(), force = FALSE){
             # check
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
             if(private$is_search_pattern(index_name)) stop(private$err_search_pattern_forbidden("index_name"))
@@ -1779,14 +1782,18 @@ Kibior <- R6Class(
             if(length(index_description) > 1) stop(private$err_one_value("index_description"))
             if(!purrr::is_character(version)) stop(private$err_param_type_character("version"))
             if(length(version) > 1) stop(private$err_one_value("version"))
-            if(!purrr::is_character(link)) stop(private$err_param_type_character("link"))
-            if(length(link) > 1) stop(private$err_one_value("link"))
-            if(!purrr::is_character(direct_download_link)) stop(private$err_param_type_character("direct_download_link"))
-            if(length(direct_download_link) > 1) stop(private$err_one_value("direct_download_link"))
+            if(!purrr::is_character(change_log)) stop(private$err_param_type_character("change_log"))
+            if(length(change_log) > 1) stop(private$err_one_value("change_log"))
+            if(!purrr::is_character(website)) stop(private$err_param_type_character("website"))
+            if(length(website) > 1) stop(private$err_one_value("website"))
+            if(!purrr::is_character(direct_download)) stop(private$err_param_type_character("direct_download"))
+            if(length(direct_download) > 1) stop(private$err_one_value("direct_download"))
             if(!purrr::is_character(version_date)) stop(private$err_param_type_character("version_date"))
             if(length(version_date) > 1) stop(private$err_one_value("version_date"))
-            if(!purrr::is_character(license_link)) stop(private$err_param_type_character("license_link"))
-            if(length(license_link) > 1) stop(private$err_one_value("license_link"))
+            if(!purrr::is_character(license)) stop(private$err_param_type_character("license"))
+            if(length(license) > 1) stop(private$err_one_value("license"))
+            if(!purrr::is_character(contact)) stop(private$err_param_type_character("contact"))
+            if(!purrr::is_character(references)) stop(private$err_param_type_character("references"))
             if(!purrr::is_logical(force)) stop(private$err_param_type_logical("force"))
             if(is.na(force)) stop(private$err_logical_na("force"))
             # check cols
@@ -1829,11 +1836,14 @@ Kibior <- R6Class(
                 dataset_name = dataset_name, 
                 source_name = source_name, 
                 index_description = index_description, 
-                version = version, 
-                link = link, 
-                direct_download_link = direct_download_link, 
+                version = version,
+                change_log = change_log,
+                website = website, 
+                direct_download = direct_download, 
                 version_date = version_date, 
-                license_link = license_link
+                license = license,
+                contact = contact,
+                references = references
             ) %>% as.data.frame(stringsAsFactors = FALSE)
             #
             new_data <- columns %>% 
@@ -1873,6 +1883,7 @@ Kibior <- R6Class(
         #'
         #' @param index_name the index name to describe
         #' @param columns a vector of column names to describe (default: NULL)
+        #' @param pretty pretty-print the result (default: FALSE)
         #'
         #' @return all description, grouped by indices
         #'
@@ -1880,12 +1891,14 @@ Kibior <- R6Class(
         #' kc$describe("s*")
         #' kc$describe("sw", columns = c("name", "height"))
         #' 
-        describe = function(index_name, columns = NULL){
+        describe = function(index_name, columns = NULL, pretty = FALSE){
             # check
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
             if(!purrr::is_null(columns) && !purrr::is_character(columns)){
                 stop(private$err_param_type_character("columns", can_be_null = TRUE))
             }
+            if(!purrr::is_logical(pretty)) stop(private$err_param_type_logical("pretty"))
+            if(is.na(pretty)) stop(private$err_logical_na("pretty"))
             # check if there is any description
             m <- suppressMessages({ self$match(index_name) })
             if(purrr::is_null(m)){
@@ -1897,22 +1910,79 @@ Kibior <- R6Class(
                 q <- paste0("index_name:", index_name)
                 if(!purrr::is_null(columns)){
                     q <- columns %>% 
-                        private$vector_to_str() %>% 
+                        paste0(collapse = " || ") %>%
                         paste0(q, " && column_name:(", ., ")")
                 }
                 if(self$verbose) message(" -> Getting actual description for '", index_name, "'")
-                tmp <- suppressMessages({
-                    self$pull(n, query = q)[[n]] %>% 
-                        dplyr::select(-c(self$default_id_col))
-                }) 
-                indices <- unique(tmp$index_name)
-                res <- indices %>% 
-                    lapply(function(n){
-                        tmp %>%
-                            dplyr::filter(index_name == n) %>%
-                            dplyr::select(-c("index_name"))
-                    })
-                names(res) <- indices
+                tmp <- suppressMessages({ self$pull(n, query = q)[[n]] })
+                if(purrr::is_null(tmp)){
+                    res <- NULL
+                } else {
+                    tmp <- tryCatch(
+                        expr = { 
+                            tmp %>% dplyr::select(-c(self$default_id_col))
+                        }, 
+                        error = function(e){
+                            if(grepl("doesn't handle lists", e$message, ignore.case = TRUE)){
+                                if(self$verbose) message(" -> Skipping. No column name matching.")
+                                NULL
+                            } else {
+                                stop(e$message)
+                            }
+                        }
+                    )
+                    if(purrr::is_null(tmp)){
+                        res <- NULL
+                    } else {
+                        indices <- unique(tmp$index_name)
+                        res <- indices %>% 
+                            lapply(function(n){
+                                tmp %>%
+                                    dplyr::filter(index_name == n) %>%
+                                    dplyr::select(-c("index_name"))
+                            })
+                        names(res) <- indices
+                    }
+                }
+            }
+            # pretty print
+            if(pretty && !purrr::is_null(res)){
+                pretty_format <- function(d,i){
+                    res <- paste0("\nIndex '", i, "':\n") %>%
+                        paste0("  - dataset name:       ", unique(d$dataset_name), "\n") %>% 
+                        paste0("  - source name:        ", unique(d$source_name), "\n") %>% 
+                        paste0("  - version:            ", unique(d$version), "\n") %>% 
+                        paste0("  - website:            ", unique(d$website), "\n") %>% 
+                        paste0("  - direct download:    ", unique(d$direct_download), "\n") %>% 
+                        paste0("  - version date:       ", unique(d$version_date), "\n") %>% 
+                        paste0("  - license:            ", unique(d$license), "\n") %>% 
+                        paste0("  - contact:            ", unique(d$contact), "\n") %>% 
+                        paste0("  - index description:  ", unique(d$index_description), "\n") %>% 
+                        paste0("  - change log:         ", unique(d$change_log), "\n")
+                    # ref
+                    references <- d$references %>% 
+                        unique() %>%
+                        lapply(function(x) paste0("    - ", x)) %>% 
+                        paste0(collapse = "\n") %>% 
+                        paste0("  - references:\n", ., "\n")
+                    # cols
+                    columns <- d %>% 
+                        dplyr::select(c("column_name", "column_description")) %>% 
+                        unique() %>% 
+                        apply(1, function(x) paste0("    - ", x[1], ": ", x[2])) %>% 
+                        paste0(collapse = "\n") %>% 
+                        paste0("  - columns:\n", ., "\n")
+                    # combine
+                    res %>% 
+                        paste0(references) %>% 
+                        paste0(columns)
+                }
+                # print  
+                res %>% 
+                    purrr::imap(pretty_format) %>% 
+                    paste0(collapse = "\n\n") %>% 
+                    cat()
+                res <- NULL
             }
             res
         },
@@ -1930,8 +2000,13 @@ Kibior <- R6Class(
         #' kc$describe_indices("s*")
         #' 
         describe_indices = function(index_name){
-            self$describe(index_name) %>% 
-                lapply(function(i) i$index_description %>% unique())
+            res <- self$describe(index_name)
+            if(!purrr::is_null(res)){
+                res <- res %>% 
+                    purrr::imap(function(d,i) d$index_description) %>%
+                    purrr::imap(function(d,i) unique(d))
+            }
+            res
         },
 
         #' @details
@@ -1948,8 +2023,13 @@ Kibior <- R6Class(
         #' kc$describe_columns("s*", c("name", "height"))
         #' 
         describe_columns = function(index_name, columns){
-            self$describe(index_name, columns = columns) %>% 
-                lapply(function(i) i %>% dplyr::select(column_name, column_description))
+            res <- self$describe(index_name, columns = columns)
+            if(!purrr::is_null(res)){
+                res <- res %>% 
+                    purrr::imap(function(d,i) dplyr::select(d, c("column_name", "column_description"))) %>% 
+                    purrr::imap(function(d,i) unique(d))
+            }
+            res
         },
 
 
@@ -4011,7 +4091,7 @@ Kibior <- R6Class(
                                         if(keep_metadata) unlist(x, recursive = FALSE) else x[["_source"]] 
                                     }) %>%
                                     rbind() %>% 
-                                    as.data.frame() %>% 
+                                    as.data.frame(stringsAsFactors = FALSE) %>% 
                                     tibble::as_tibble() %>%
                                     change_column_type()
                                 
