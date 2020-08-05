@@ -1877,6 +1877,30 @@ Kibior <- R6Class(
         },
 
         #' @details
+        #' Does the description exists?
+        #'
+        #' @family kibior-metadata
+        #'
+        #' @param index_name the index name to describe
+        #'
+        #' @return a list splitted by index, with TRUE if the description is 
+        #'  found, else FALSE. Removes unknown index names.
+        #'
+        #' @examples
+        #' kc$has_description("s*")
+        #' kc$has_description(c("sw", "asdf"))
+        #' 
+        has_description = function(index_name){
+            i <- self$match(index_name)
+            if(purrr::is_null(i)) stop("No index found with these names or pattern.")
+            n <- private$.KIBIOR_METADATA_INDICES
+            tmp <- suppressMessages({ self$pull(n)[[n]]$index_name }) %>% unique()
+            res <- i %>% lapply(function(d){ d %in% tmp })
+            names(res) <- i
+            res
+        },
+
+        #' @details
         #' Get the description of indices and their columns.
         #'
         #' @family kibior-metadata
