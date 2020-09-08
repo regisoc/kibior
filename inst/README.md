@@ -1,4 +1,68 @@
 
+
+
+# Vignettes and tests
+
+Tests and vignettes need an empty ElasticSearch (ES) instance to really test the core KibioR methods (e.g. push, pull, search). They can be conducted throught an ES instance run via Docker to easily select multiple versions.
+Unfortunately, interactive build has been removed since BioC and CRAN cannot deploy a single ES instance during build/check phases (not accessible during build/check).
+
+When linked to ES, you can run the **full test suite** and compile the **interactive vignettes**.
+Follow the rest of the file to make it happen.
+
+## Folder organization
+
+After downloading the project sources, you can find all that is needed inside the "doc_env" folder:
+
+- "test_suite" folder contains all tests.
+- "interactive_vignettes" contains all interactive vignettes.
+- "kibior_build.R" is a helper that will automatically be called when trying to build/check tests and vignettes.
+
+## Requirements
+
+An empty and accessible ES running instance.
+You can download the project from ES website or run a single instance via Docker.
+See the fixed vignette, section **Deploying an Elasticsearch instance** to set one with Docker.
+
+## Process
+
+- Download `KibioR` source from Github.
+
+### Install and check ES instance 
+
+- Verify the accessibility of the ES instance:
+  - Run `curl -XGET "<ES_ADDRESS>:<ES_PORT>"`
+  - You should get a JSON result ending with `"You Know, For Search"`
+- Set env variable to target the ES instance:
+  - variables are:
+    - `KIBIOR_BUILD_ES_ENDPOINT="elasticsearch"` for ES address (no default)
+    - `KIBIOR_BUILD_ES_PORT=9200` for ES port (default, 9200)
+    - `KIBIOR_BUILD_ES_USERNAME` for ES username (default, unused if not set)
+    - `KIBIOR_BUILD_ES_PASSWORD` for ES password (default, unused if not set)
+  - the most simple:
+    - Put them in a `.Renviron` in the project root (one line for each).
+    - They will be called automatically with the build/check steps.
+- Test the setting with:
+  - if you do not have a password: `curl -XGET "KIBIOR_BUILD_ES_ENDPOINT:KIBIOR_BUILD_ES_PORT"`
+  - if you do: `curl -u KIBIOR_BUILD_ES_USERNAME:KIBIOR_BUILD_ES_PASSWORD -XGET "KIBIOR_BUILD_ES_ENDPOINT:KIBIOR_BUILD_ES_PORT"`
+
+### Interactive vignettes generation
+
+- Inside the project folder, take the "inst/doc_env/interactive_vignettes" folder content and copy it in "vignettes" folder.
+- Go to the parent folder and run the build on Kibior folder: `R CMD build kibior`.
+- Open the generated archive (something linke `kibior_<VERSION>.tar.gz`) to find the "introduction.nb.html"
+
+### Full test suite
+
+> Be warned that there are lots of tests.
+> They can take more than an hour to run on older CPUs.
+> You can regulate the number of tests by modifying the calls inside the "tests/testthat.R" file.
+
+- Inside the project folder, take the "inst/doc_env/test_suite" folder content and copy it in "tests/testthat" folder.
+- Go to the parent folder and run the build on Kibior folder: `R CMD build kibior`.
+- Then, check the generated archive: `R CMD check kibior_<VERSION>.tar.gz`.
+
+
+
 # Data informations
 
 

@@ -57,7 +57,6 @@ kc <- Kibior$new(host = "elasticsearch", port = 15005, verbose = TRUE)
 kc <- Kibior$new(host = "192.168.2.145", port = 9450, user = "foo", pwd = "bar")
 # connect to "elasticsearch:9200"
 kc <- Kibior$new("elasticsearch")
-}
 
 # get kibior var from env (".Renviron" file or local env) 
 dd <- system.file("doc_env", "kibior_build.R", package = "kibior")
@@ -85,20 +84,26 @@ delete_if_exists(c(
     "storms",
     "starwars"
 ))
+}
 
 
 ## ------------------------------------------------
 ## Method `Kibior$print`
 ## ------------------------------------------------
 
+\dontrun{
 print(kc)
+}
+
 
 
 ## ------------------------------------------------
 ## Method `Kibior$eq`
 ## ------------------------------------------------
 
+\dontrun{
 kc$eq(kc)
+}
 
 
 
@@ -106,187 +111,489 @@ kc$eq(kc)
 ## Method `Kibior$ne`
 ## ------------------------------------------------
 
+\dontrun{
 kc$ne(kc)
+}
 
 
 ## ------------------------------------------------
 ## Method `Kibior$create`
 ## ------------------------------------------------
 
+\dontrun{
 kc$create("aaa")
 kc$create(c("bbb", "ccc"))
+}
 
 
 ## ------------------------------------------------
 ## Method `Kibior$list`
 ## ------------------------------------------------
 
+\dontrun{
 kc$list()
 kc$list(get_specials = TRUE)
+}
 
 
 ## ------------------------------------------------
 ## Method `Kibior$has`
 ## ------------------------------------------------
 
+\dontrun{
 kc$has("aaa")
 kc$has(c("bbb", "ccc"))
+}
 
 
 ## ------------------------------------------------
 ## Method `Kibior$delete`
 ## ------------------------------------------------
 
+\dontrun{
 kc$delete("aaa")
 kc$delete(c("bbb", "ccc"))
+}
 
 
 ## ------------------------------------------------
-## Method `Kibior$stats`
+## Method `Kibior$add_description`
 ## ------------------------------------------------
 
-kc$stats()
+\dontrun{
+kc$add_description(
+    index_name = "sw", 
+    dataset_name = "starwars", 
+    source_name = "Package dplyr", 
+    index_description = "Description of starwars characters, the data comes from the Star 
+     Wars API.", 
+    version = "dplyr (1.0.0)", 
+    link = "http://swapi.dev/", 
+    direct_download_link = "http://swapi.dev/", 
+    version_date = "2020-05-28", 
+    license_link = "MIT", 
+    columns = list(
+        "name" = "Name of the character",
+        "height" = "Height (cm)",
+        "mass" = "Weight (kg)",
+        "hair_color" = "Hair colors",
+        "skin_color" = "Skin colors",
+        "eye_color" = "Eye colors",
+        "birth_year" = "Year born (BBY = Before Battle of Yavin)",
+        "sex" = "The biological sex of the character, namely male, female, 
+             hermaphroditic, or none (as in the case for Droids).",
+        "gender" = "The gender role or gender identity of the character as determined by 
+             their personality or the way they were progammed (as in the case for Droids
+             ).",
+        "homeworld" = "Name of homeworld",
+        "species" = "Name of species",
+        "films" = "List of films the character appeared in",
+        "vehicles" = "List of vehicles the character has piloted",
+        "starships" = "List of starships the character has piloted"
+    )
+)
+}
+
+
+## ------------------------------------------------
+## Method `Kibior$has_description`
+## ------------------------------------------------
+
+\dontrun{
+kc$has_description("s*")
+kc$has_description(c("sw", "asdf"))
+}
+
+
+## ------------------------------------------------
+## Method `Kibior$missing_descriptions`
+## ------------------------------------------------
+
+\dontrun{
+kc$missing_descriptions()
+}
+
+
+## ------------------------------------------------
+## Method `Kibior$remove_description`
+## ------------------------------------------------
+
+\dontrun{
+# remove the description of 'test' index
+kc$remove_description("test")
+}
+
+
+## ------------------------------------------------
+## Method `Kibior$clean_descriptions`
+## ------------------------------------------------
+
+\dontrun{
+# remove the description of 'test' index
+kc$clean_descriptions()
+}
+
+
+## ------------------------------------------------
+## Method `Kibior$describe`
+## ------------------------------------------------
+
+\dontrun{
+kc$describe("s*")
+kc$describe("sw", columns = c("name", "height"))
+}
+
+
+## ------------------------------------------------
+## Method `Kibior$describe_index`
+## ------------------------------------------------
+
+\dontrun{
+kc$describe_index("s*")
+}
+
+
+## ------------------------------------------------
+## Method `Kibior$describe_columns`
+## ------------------------------------------------
+
+\dontrun{
+kc$describe_columns("s*", c("name", "height"))
+}
+
+
+## ------------------------------------------------
+## Method `Kibior$infos`
+## ------------------------------------------------
+
+\dontrun{
+kc$infos()
+}
 
 
 ## ------------------------------------------------
 ## Method `Kibior$ping`
 ## ------------------------------------------------
 
+\dontrun{
 kc$ping()
-
-
-## ------------------------------------------------
-## Method `Kibior$metadata`
-## ------------------------------------------------
-
-# push test data, without magrittr
-kc$push(dplyr::starwars, "sw")
-kc$push(dplyr::filter(dplyr::starwars, homeworld == "Naboo"), "sw_naboo")
-kc$push(dplyr::filter(dplyr::starwars, homeworld == "Tatooine"), "sw_tatooine")
-kc$push(dplyr::filter(dplyr::starwars, homeworld == "Alderaan"), "sw_alderaan")
-# metadata
-kc$metadata()
-kc$metadata("sw")
-kc$metadata(c("sw", "sw_naboo"))
+}
 
 
 ## ------------------------------------------------
 ## Method `Kibior$mappings`
 ## ------------------------------------------------
 
+\dontrun{
 kc$mappings()
 kc$mappings("sw")
 kc$mappings(c("sw", "sw_naboo"))
+}
 
 
 ## ------------------------------------------------
 ## Method `Kibior$settings`
 ## ------------------------------------------------
 
+\dontrun{
 kc$settings()
 kc$settings("sw")
 kc$settings(c("sw", "sw_tatooine"))
+}
 
 
 ## ------------------------------------------------
 ## Method `Kibior$aliases`
 ## ------------------------------------------------
 
+\dontrun{
 kc$aliases()
 kc$aliases("sw")
 kc$aliases(c("sw", "sw_alderaan"))
-
-
-## ------------------------------------------------
-## Method `Kibior$count`
-## ------------------------------------------------
-
-# Number of observations (nb of records) in "sw"
-kc$count("sw")
-# Number of observations in indices "sw_naboo" and "sw_tatooine"
-kc$count(c("sw_naboo", "sw_tatooine"))
-# Number of variables (nb of columns) in index "sw_naboo"
-kc$count("sw_naboo", type = "variables")
+}
 
 
 ## ------------------------------------------------
 ## Method `Kibior$dim`
 ## ------------------------------------------------
 
+\dontrun{
 # Couple [<nb obs> <nb var>] in "sw"
 kc$dim("sw")
 # Couple [<nb obs> <nb var>] in indices "sw_naboo" and "sw_alderaan"
 kc$dim(c("sw_naboo", "sw_alderaan"))
+}
 
 
 ## ------------------------------------------------
 ## Method `Kibior$columns`
 ## ------------------------------------------------
 
+\dontrun{
 kc$columns("sw")          # direct search
 kc$columns("sw_*")        # pattern search
+}
+
+
+## ------------------------------------------------
+## Method `Kibior$count`
+## ------------------------------------------------
+
+\dontrun{
+# Number of observations (nb of records) in "sw"
+kc$count("sw")
+# Number of observations in indices "sw_naboo" and "sw_tatooine"
+kc$count(c("sw_naboo", "sw_tatooine"))
+# Number of variables (nb of columns) in index "sw_naboo"
+kc$count("sw_naboo", type = "variables")
+}
+
+
+## ------------------------------------------------
+## Method `Kibior$avg`
+## ------------------------------------------------
+
+\dontrun{
+# Avg of "sw" column "height"
+kc$avg("sw", "height")
+# if pattern
+kc$avg("s*", "height")
+# multiple indices, multiple columns
+kc$avg(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+}
+
+
+## ------------------------------------------------
+## Method `Kibior$mean`
+## ------------------------------------------------
+
+\dontrun{
+# mean of "sw" column "height"
+kc$mean("sw", "height")
+# if pattern
+kc$mean("s*", "height")
+# multiple indices, multiple columns
+kc$mean(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+}
+
+
+## ------------------------------------------------
+## Method `Kibior$min`
+## ------------------------------------------------
+
+\dontrun{
+# min of "sw" column "height"
+kc$min("sw", "height")
+# if pattern
+kc$min("s*", "height")
+# multiple indices, multiple columns
+kc$min(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+}
+
+
+## ------------------------------------------------
+## Method `Kibior$max`
+## ------------------------------------------------
+
+\dontrun{
+# max of "sw" column "height"
+kc$max("sw", "height")
+# if pattern
+kc$max("s*", "height")
+# multiple indices, multiple columns
+kc$max(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+}
+
+
+## ------------------------------------------------
+## Method `Kibior$sum`
+## ------------------------------------------------
+
+\dontrun{
+# sum of "sw" column "height"
+kc$sum("sw", "height")
+# if pattern
+kc$sum("s*", "height")
+# multiple indices, multiple columns
+kc$sum(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+}
+
+
+## ------------------------------------------------
+## Method `Kibior$stats`
+## ------------------------------------------------
+
+\dontrun{
+# Stats of "sw" column "height"
+kc$stats("sw", "height")
+# if pattern
+kc$stats("s*", "height")
+# multiple indices and sigma definition
+kc$stats(c("sw", "sw2"), "height", sigma = 2.5)
+# multiple indices, multiple columns
+kc$stats(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+}
+
+
+## ------------------------------------------------
+## Method `Kibior$percentiles`
+## ------------------------------------------------
+
+\dontrun{
+# percentiles of "sw" column "height", default is with q1, q2 and q3
+kc$percentiles("sw", "height")
+# if pattern
+kc$percentiles("s*", "height")
+# defining percents to get
+kc$percentiles("s*", "height", percents = c(20, 25))
+# multiple indices, multiple columns
+kc$percentiles(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+}
+
+
+## ------------------------------------------------
+## Method `Kibior$q1`
+## ------------------------------------------------
+
+\dontrun{
+# Q1 of "sw" column "height"
+kc$q1("sw", "height")
+# if pattern
+kc$q1("s*", "height")
+# multiple indices, multiple columns
+kc$q1(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+}
+
+
+## ------------------------------------------------
+## Method `Kibior$q2`
+## ------------------------------------------------
+
+\dontrun{
+# Q2 of "sw" column "height"
+kc$q2("sw", "height")
+# if pattern
+kc$q2("s*", "height")
+# multiple indices, multiple columns
+kc$q2(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+}
+
+
+## ------------------------------------------------
+## Method `Kibior$median`
+## ------------------------------------------------
+
+\dontrun{
+# median of "sw" column "height"
+kc$median("sw", "height")
+# if pattern
+kc$median("s*", "height")
+# multiple indices, multiple columns
+kc$median(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+}
+
+
+## ------------------------------------------------
+## Method `Kibior$q3`
+## ------------------------------------------------
+
+\dontrun{
+# Q3 of "sw" column "height"
+kc$q3("sw", "height")
+# if pattern
+kc$q3("s*", "height")
+# multiple indices, multiple columns
+kc$q3(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+}
+
+
+## ------------------------------------------------
+## Method `Kibior$summary`
+## ------------------------------------------------
+
+\dontrun{
+# summary of "sw" column "height"
+kc$summary("sw", "height")
+# if pattern
+kc$summary("s*", "height")
+# multiple indices, multiple columns
+kc$summary(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+}
 
 
 ## ------------------------------------------------
 ## Method `Kibior$keys`
 ## ------------------------------------------------
 
+\dontrun{
 kc$keys("sw", "name")
 kc$keys("sw", "eye_color")
+}
 
 
 ## ------------------------------------------------
 ## Method `Kibior$bam_to_tibble`
 ## ------------------------------------------------
 
+\dontrun{
 dd_bai <- system.file("extdata", "test.bam.bai", package = "kibior")
 bam_param <- Rsamtools::ScanBamParam(what = c("pos", "qwidth"))
 bam_data <- Rsamtools::scanBam(dd_bai, param = bam_param)
 kc$bam_to_tibble(bam_data)
+}
 
 
 ## ------------------------------------------------
 ## Method `Kibior$soft_cast`
 ## ------------------------------------------------
 
+\dontrun{
 kc$soft_cast(datasets::iris)
+}
 
 
 ## ------------------------------------------------
 ## Method `Kibior$get_resource`
 ## ------------------------------------------------
 
+\dontrun{
 kc$get_resource(system.file("R", "kibior.R", package = "kibior"))
 kc$get_resource("https://ftp.ncbi.nlm.nih.gov/entrez/README")
+}
 
 
 ## ------------------------------------------------
 ## Method `Kibior$export`
 ## ------------------------------------------------
 
+\dontrun{
 f <- tempfile(fileext=".csv")
 # export and overwrite last file with the same data from Elasticsearch
 kc$export(data = "sw", filepath = f)
 # export from in-memory data to a file
 kc$export(data = dplyr::starwars, filepath = f, force = TRUE)
+}
 
 
 ## ------------------------------------------------
 ## Method `Kibior$import_tabular`
 ## ------------------------------------------------
 
+\dontrun{
 f <- tempfile(fileext = ".csv")
 rio::export(ggplot2::diamonds, f)
 # import to in-memory variable
 kc$import_tabular(filepath = f)
 # import raw data
 kc$import_tabular(filepath = f, to_tibble = FALSE)
+}
 
 
 ## ------------------------------------------------
 ## Method `Kibior$import_features`
 ## ------------------------------------------------
 
+\dontrun{
 # get sample files
 f_gff <- system.file("extdata", "chr_y.gff3.gz", package = "kibior")
 f_bed <- system.file("extdata", "cpg.bed", package = "kibior")
@@ -296,36 +603,42 @@ kc$import_features(filepath = f_gff)
 # import raw data
 kc$import_features(filepath = f_bed, to_tibble = FALSE)
 kc$import_features(filepath = f_gff, to_tibble = FALSE)
+}
 
 
 ## ------------------------------------------------
 ## Method `Kibior$import_alignments`
 ## ------------------------------------------------
 
+\dontrun{
 # get sample file
 f_bai <- system.file("extdata", "test.bam.bai", package = "kibior")
 # import to in-memory variable
 kc$import_alignments(filepath = f_bai)
 # import raw data
 kc$import_alignments(filepath = f_bai, to_tibble = FALSE)
+}
 
 
 ## ------------------------------------------------
 ## Method `Kibior$import_json`
 ## ------------------------------------------------
 
+\dontrun{
 # get sample file
 f_json <- system.file("extdata", "storms100.json", package = "kibior")
 # import to in-memory variable
 kc$import_json(f_json)
 # import raw data
 kc$import_json(f_json, to_tibble = FALSE)
+}
 
 
 ## ------------------------------------------------
 ## Method `Kibior$import_sequences`
 ## ------------------------------------------------
 
+\dontrun{
 # get sample file
 f_dna <- system.file("extdata", "dna_human_y.fa.gz", package = "kibior")
 f_rna <- system.file("extdata", "ncrna_mus_musculus.fa.gz", package = "kibior")
@@ -336,12 +649,14 @@ kc$import_sequences(filepath = f_dna, fasta_type = "dna")
 kc$import_sequences(filepath = f_rna, to_tibble = FALSE, fasta_type = "rna")
 # import auto
 kc$import_sequences(filepath = f_aa)
+}
 
 
 ## ------------------------------------------------
 ## Method `Kibior$guess_import`
 ## ------------------------------------------------
 
+\dontrun{
 # get sample file
 f_dna <- system.file("extdata", "dna_human_y.fa.gz", package = "kibior")
 f_rna <- system.file("extdata", "ncrna_mus_musculus.fa.gz", package = "kibior")
@@ -356,12 +671,14 @@ kc$guess_import(f_aa)
 kc$guess_import(f_bai)
 kc$guess_import(f_gff)
 kc$guess_import(f_bed)
+}
 
 
 ## ------------------------------------------------
 ## Method `Kibior$import`
 ## ------------------------------------------------
 
+\dontrun{
 # get sample file
 f_aa <- system.file("extdata", "pep_mus_spretus.fa.gz", package = "kibior")
 f_gff <- system.file("extdata", "chr_y.gff3.gz", package = "kibior")
@@ -373,12 +690,14 @@ kc$import(filepath = f_bai, push_index = "sw_from_file")
 # import to index by recreating it, then pull indexed data
 kc$import(filepath = f_gff, push_index = "sw_from_file",
  push_mode = "recreate")
+}
 
 
 ## ------------------------------------------------
 ## Method `Kibior$push`
 ## ------------------------------------------------
 
+\dontrun{
 # erase the last push data by recreating the index and re-pushing data
 kc$push(dplyr::starwars, index_name = "sw", mode = "recreate")
 # characters names are unique, can be used as ID
@@ -392,12 +711,14 @@ some_new_data["gender"] <- "female"
 kc$push(some_new_data, "sw", mode = "update", id_col = "name")
 # view result by querying
 kc$pull("sw", query = "height:>180", columns = c("name", "gender"))
+}
 
 
 ## ------------------------------------------------
 ## Method `Kibior$pull`
 ## ------------------------------------------------
 
+\dontrun{
 # push some data sample
 kc$push(dplyr::storms, "storms")
 # get the whole "sw" index
@@ -416,33 +737,39 @@ r <- kc$pull("sw", query = "height:>180 && homeworld:(Tatooine || Naboo)")
 # it can be used in conjunction with `columns` to select only columns that matter
 r <- kc$pull("sw", query = "height:>180 && homeworld:(Tatooine || Naboo)", columns = 
  c("name", "hair_color", "homeworld"))
+}
 
 
 ## ------------------------------------------------
 ## Method `Kibior$move`
 ## ------------------------------------------------
 
+\dontrun{
 kc$push(dplyr::starwars, "sw", mode = "recreate")
 # move data from an index to another (change name, same instance)
 r <- kc$move(from_index = "sw", to_index = "sw_new")
 kc$pull("sw_new")
-kc$list() 
+kc$list()
+} 
 
 
 ## ------------------------------------------------
 ## Method `Kibior$copy`
 ## ------------------------------------------------
 
+\dontrun{
 # copy data from one index to another (same instance)
 r <- kc$copy(from_index = "sw_new", to_index = "sw")
 kc$pull(c("sw", "sw_new"))
-kc$list() 
+kc$list()
+} 
 
 
 ## ------------------------------------------------
 ## Method `Kibior$match`
 ## ------------------------------------------------
 
+\dontrun{
 # search "sw" index name
 kc$match("sw")
 # search all starting with an "s"
@@ -453,12 +780,14 @@ kc$match("*")
 kc$match(c("sw", "sw_new", "nope"))
 # search multiple names with pattern
 kc$match(c("s*", "nope"))
+}
 
 
 ## ------------------------------------------------
 ## Method `Kibior$search`
 ## ------------------------------------------------
 
+\dontrun{
 # search "sw" index, head mode on
 kc$search("sw")
 # search "sw" index with all metadata, head mode on
@@ -475,12 +804,14 @@ kc$search("*", query = "height:>180 && homeworld:(Tatooine || Naboo)")
 # it can be used in conjunction with `columns` to select only columns that matter
 kc$search("*", query = "height:>180 && homeworld:(Tatooine || Naboo)", columns = 
  c("name", "hair_color", "homeworld"))
+}
 
 
 ## ------------------------------------------------
 ## Method `Kibior$inner_join`
 ## ------------------------------------------------
 
+\dontrun{
 # some data for joins examples
 kc$push(ggplot2::diamonds, "diamonds")
 # prepare join datasets, only big the biggest diamonds are selected (9)
@@ -491,12 +822,14 @@ kc$inner_join(ggplot2::diamonds, "diamonds_superior")
 # execute a inner_join with one index queried, and one in-memory dataset
 kc$inner_join(ggplot2::diamonds, "diamonds", right_query 
  = "carat:>3.5")
+}
 
 
 ## ------------------------------------------------
 ## Method `Kibior$full_join`
 ## ------------------------------------------------
 
+\dontrun{
 # prepare join datasets, fair cuts 
 fair_cut <- dplyr::filter(ggplot2::diamonds, cut == "Fair")  # 1605 lines
 sup_carat <- kc$pull("diamonds_superior")$diamonds_superior
@@ -504,12 +837,14 @@ sup_carat <- kc$pull("diamonds_superior")$diamonds_superior
 kc$full_join(fair_cut, "diamonds_superior")
 # execute a full_join with one index queried, and one in-memory dataset
 kc$full_join(sup_carat, "diamonds", right_query = "cut:fair")
+}
 
 
 ## ------------------------------------------------
 ## Method `Kibior$left_join`
 ## ------------------------------------------------
 
+\dontrun{
 # prepare join datasets, fair cuts 
 fair_cut <- dplyr::filter(ggplot2::diamonds, cut == "Fair")  # 1605 lines
 sup_carat <- kc$pull("diamonds_superior")$diamonds_superior
@@ -518,12 +853,14 @@ kc$left_join(fair_cut, "diamonds_superior")
 # execute a left_join with one index queried, and one in-memory dataset
 kc$left_join(sup_carat, "diamonds", right_query 
  = "cut:fair")
+}
 
 
 ## ------------------------------------------------
 ## Method `Kibior$right_join`
 ## ------------------------------------------------
 
+\dontrun{
 # prepare join datasets, fair cuts 
 fair_cut <- dplyr::filter(ggplot2::diamonds, cut == "Fair")  # 1605 lines
 sup_carat <- kc$pull("diamonds_superior")$diamonds_superior
@@ -532,12 +869,14 @@ kc$right_join(fair_cut, "diamonds_superior")
 # execute a right_join with one index queried, and one in-memory dataset
 kc$right_join(sup_carat, "diamonds", right_query 
  = "cut:fair")
+}
 
 
 ## ------------------------------------------------
 ## Method `Kibior$semi_join`
 ## ------------------------------------------------
 
+\dontrun{
 # prepare join datasets, fair cuts 
 fair_cut <- dplyr::filter(ggplot2::diamonds, cut == "Fair")  # 1605 lines
 sup_carat <- kc$pull("diamonds_superior")$diamonds_superior
@@ -546,12 +885,14 @@ kc$semi_join(fair_cut, "diamonds_superior")
 # execute a semi_join with one index queried, and one in-memory dataset
 kc$semi_join(sup_carat, "diamonds", right_query 
  = "cut:fair")
+}
 
 
 ## ------------------------------------------------
 ## Method `Kibior$anti_join`
 ## ------------------------------------------------
 
+\dontrun{
 # prepare join datasets, fair cuts 
 fair_cut <- dplyr::filter(ggplot2::diamonds, cut == "Fair")  # 1605 lines
 sup_carat <- kc$pull("diamonds_superior")$diamonds_superior
@@ -564,6 +905,7 @@ kc$anti_join(sup_carat, "diamonds", right_query
 # Do not mind this, removing example indices
 elastic::index_delete(kc$connection, "*")
 kc <- NULL
+}
 
 }
 \references{
@@ -573,6 +915,8 @@ Kibio.science: \url{http://kibio.science}, \cr
 }
 \seealso{
 \code{\link{kibior}}
+
+you should use \code{\link{count}} for more accurate count.
 
 \url{https://www.elastic.co/guide/en/elasticsearch/reference/current/common-options.html#time-units} 
  for time-units and \url{https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html#query-string-syntax}
@@ -597,9 +941,10 @@ Régis Ongaro-Carcy,
 \concept{crud-metadata}
 \concept{data-manipulation}
 \concept{joins}
+\concept{kibior-metadata}
 \concept{move-data}
-\concept{move-data, search}
-\concept{search}
+\concept{search-data}
+\concept{stats}
 \keyword{data}
 \keyword{dataset}
 \keyword{integration}
@@ -608,10 +953,9 @@ Régis Ongaro-Carcy,
 \describe{
 \item{\code{verbose}}{verbose mode, prints out more informations during execution}
 
-\item{\code{quiet_progress}}{progressbar quiet mode, remove progress bar, useful for cleaner 
-tests}
+\item{\code{quiet_progress}}{progressbar quiet mode, toggles progress bar}
 
-\item{\code{quiet_results}}{results quiet mode, make results of methods invisible}
+\item{\code{quiet_results}}{results quiet mode, toggles results printing}
 }
 \if{html}{\out{</div>}}
 }
@@ -676,15 +1020,34 @@ data to Elasticsearch.}
 \item \href{#method-list}{\code{Kibior$list()}}
 \item \href{#method-has}{\code{Kibior$has()}}
 \item \href{#method-delete}{\code{Kibior$delete()}}
-\item \href{#method-stats}{\code{Kibior$stats()}}
+\item \href{#method-add_description}{\code{Kibior$add_description()}}
+\item \href{#method-has_description}{\code{Kibior$has_description()}}
+\item \href{#method-missing_descriptions}{\code{Kibior$missing_descriptions()}}
+\item \href{#method-remove_description}{\code{Kibior$remove_description()}}
+\item \href{#method-clean_descriptions}{\code{Kibior$clean_descriptions()}}
+\item \href{#method-describe}{\code{Kibior$describe()}}
+\item \href{#method-describe_index}{\code{Kibior$describe_index()}}
+\item \href{#method-describe_columns}{\code{Kibior$describe_columns()}}
+\item \href{#method-infos}{\code{Kibior$infos()}}
 \item \href{#method-ping}{\code{Kibior$ping()}}
-\item \href{#method-metadata}{\code{Kibior$metadata()}}
 \item \href{#method-mappings}{\code{Kibior$mappings()}}
 \item \href{#method-settings}{\code{Kibior$settings()}}
 \item \href{#method-aliases}{\code{Kibior$aliases()}}
-\item \href{#method-count}{\code{Kibior$count()}}
 \item \href{#method-dim}{\code{Kibior$dim()}}
 \item \href{#method-columns}{\code{Kibior$columns()}}
+\item \href{#method-count}{\code{Kibior$count()}}
+\item \href{#method-avg}{\code{Kibior$avg()}}
+\item \href{#method-mean}{\code{Kibior$mean()}}
+\item \href{#method-min}{\code{Kibior$min()}}
+\item \href{#method-max}{\code{Kibior$max()}}
+\item \href{#method-sum}{\code{Kibior$sum()}}
+\item \href{#method-stats}{\code{Kibior$stats()}}
+\item \href{#method-percentiles}{\code{Kibior$percentiles()}}
+\item \href{#method-q1}{\code{Kibior$q1()}}
+\item \href{#method-q2}{\code{Kibior$q2()}}
+\item \href{#method-median}{\code{Kibior$median()}}
+\item \href{#method-q3}{\code{Kibior$q3()}}
+\item \href{#method-summary}{\code{Kibior$summary()}}
 \item \href{#method-keys}{\code{Kibior$keys()}}
 \item \href{#method-bam_to_tibble}{\code{Kibior$bam_to_tibble()}}
 \item \href{#method-soft_cast}{\code{Kibior$soft_cast()}}
@@ -761,7 +1124,6 @@ kc <- Kibior$new(host = "elasticsearch", port = 15005, verbose = TRUE)
 kc <- Kibior$new(host = "192.168.2.145", port = 9450, user = "foo", pwd = "bar")
 # connect to "elasticsearch:9200"
 kc <- Kibior$new("elasticsearch")
-}
 
 # get kibior var from env (".Renviron" file or local env) 
 dd <- system.file("doc_env", "kibior_build.R", package = "kibior")
@@ -789,6 +1151,7 @@ delete_if_exists(c(
     "storms",
     "starwars"
 ))
+}
 
 }
 \if{html}{\out{</div>}}
@@ -810,7 +1173,10 @@ Print simple informations of the current object.
 
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{print(kc)
+\preformatted{\dontrun{
+print(kc)
+}
+
 
 }
 \if{html}{\out{</div>}}
@@ -842,7 +1208,9 @@ TRUE if hosts and ports are identical, else FALSE
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{kc$eq(kc)
+\preformatted{\dontrun{
+kc$eq(kc)
+}
 
 
 }
@@ -875,7 +1243,9 @@ TRUE if hosts and ports are differents, else FALSE
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{kc$ne(kc)
+\preformatted{\dontrun{
+kc$ne(kc)
+}
 
 }
 \if{html}{\out{</div>}}
@@ -909,8 +1279,10 @@ a list containing results of creation per index
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{kc$create("aaa")
+\preformatted{\dontrun{
+kc$create("aaa")
 kc$create(c("bbb", "ccc"))
+}
 
 }
 \if{html}{\out{</div>}}
@@ -942,8 +1314,10 @@ a list of index names, NULL if no index found
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{kc$list()
+\preformatted{\dontrun{
+kc$list()
 kc$list(get_specials = TRUE)
+}
 
 }
 \if{html}{\out{</div>}}
@@ -975,8 +1349,10 @@ a list with TRUE for found index, else FALSE
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{kc$has("aaa")
+\preformatted{\dontrun{
+kc$has("aaa")
 kc$has(c("bbb", "ccc"))
+}
 
 }
 \if{html}{\out{</div>}}
@@ -1008,8 +1384,10 @@ a list containing results of deletion per index, or NULL if no index name match
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{kc$delete("aaa")
+\preformatted{\dontrun{
+kc$delete("aaa")
 kc$delete(c("bbb", "ccc"))
+}
 
 }
 \if{html}{\out{</div>}}
@@ -1018,15 +1396,356 @@ kc$delete(c("bbb", "ccc"))
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-stats"></a>}}
-\if{latex}{\out{\hypertarget{method-stats}{}}}
-\subsection{Method \code{stats()}}{
+\if{html}{\out{<a id="method-add_description"></a>}}
+\if{latex}{\out{\hypertarget{method-add_description}{}}}
+\subsection{Method \code{add_description()}}{
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Kibior$stats()}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{Kibior$add_description(
+  index_name,
+  dataset_name,
+  source_name,
+  index_description,
+  version,
+  change_log,
+  website,
+  direct_download,
+  version_date,
+  license,
+  contact,
+  references,
+  columns = list(),
+  force = FALSE
+)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{index_name}}{the index name to describe}
+
+\item{\code{dataset_name}}{the full length dataset name}
+
+\item{\code{source_name}}{the source/website/entity full length name}
+
+\item{\code{index_description}}{the index description, should be explicit}
+
+\item{\code{version}}{the version of the source dataset}
+
+\item{\code{change_log}}{what have been done from the last version}
+
+\item{\code{website}}{the website to the source dataset website}
+
+\item{\code{direct_download}}{the direct download url of the dataset source}
+
+\item{\code{version_date}}{the version or build date}
+
+\item{\code{license}}{the license attached to this dataset, could be a url}
+
+\item{\code{contact}}{a mailto/contact}
+
+\item{\code{references}}{some paper and other references (e.g. doi, url)}
+
+\item{\code{columns}}{a list of (column_name = column_description) to register (default: list())}
+
+\item{\code{force}}{if FALSE, raise an error if the description already exists, else TRUE to 
+overwrite (default: FALSE)}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Details}{
+Add a description of a pushed dataset.
+}
+
+\subsection{Returns}{
+the index name if complete, else an error
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+kc$add_description(
+    index_name = "sw", 
+    dataset_name = "starwars", 
+    source_name = "Package dplyr", 
+    index_description = "Description of starwars characters, the data comes from the Star 
+     Wars API.", 
+    version = "dplyr (1.0.0)", 
+    link = "http://swapi.dev/", 
+    direct_download_link = "http://swapi.dev/", 
+    version_date = "2020-05-28", 
+    license_link = "MIT", 
+    columns = list(
+        "name" = "Name of the character",
+        "height" = "Height (cm)",
+        "mass" = "Weight (kg)",
+        "hair_color" = "Hair colors",
+        "skin_color" = "Skin colors",
+        "eye_color" = "Eye colors",
+        "birth_year" = "Year born (BBY = Before Battle of Yavin)",
+        "sex" = "The biological sex of the character, namely male, female, 
+             hermaphroditic, or none (as in the case for Droids).",
+        "gender" = "The gender role or gender identity of the character as determined by 
+             their personality or the way they were progammed (as in the case for Droids
+             ).",
+        "homeworld" = "Name of homeworld",
+        "species" = "Name of species",
+        "films" = "List of films the character appeared in",
+        "vehicles" = "List of vehicles the character has piloted",
+        "starships" = "List of starships the character has piloted"
+    )
+)
+}
+
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-has_description"></a>}}
+\if{latex}{\out{\hypertarget{method-has_description}{}}}
+\subsection{Method \code{has_description()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Kibior$has_description(index_name)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{index_name}}{the index name to describe}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Details}{
+Does the description exists?
+}
+
+\subsection{Returns}{
+a list splitted by index, with TRUE if the description is 
+ found, else FALSE. Removes unknown index names.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+kc$has_description("s*")
+kc$has_description(c("sw", "asdf"))
+}
+
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-missing_descriptions"></a>}}
+\if{latex}{\out{\hypertarget{method-missing_descriptions}{}}}
+\subsection{Method \code{missing_descriptions()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Kibior$missing_descriptions()}\if{html}{\out{</div>}}
 }
 
 \subsection{Details}{
-Get stats about Elasticsearch cluster
+List indices that do no have descriptions.
+}
+
+\subsection{Returns}{
+a vector of indices not present in description.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+kc$missing_descriptions()
+}
+
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-remove_description"></a>}}
+\if{latex}{\out{\hypertarget{method-remove_description}{}}}
+\subsection{Method \code{remove_description()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Kibior$remove_description(index_name)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{index_name}}{the index name to describe}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Details}{
+Remove a description.
+}
+
+\subsection{Returns}{
+a vector of indices not present in description.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+# remove the description of 'test' index
+kc$remove_description("test")
+}
+
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-clean_descriptions"></a>}}
+\if{latex}{\out{\hypertarget{method-clean_descriptions}{}}}
+\subsection{Method \code{clean_descriptions()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Kibior$clean_descriptions()}\if{html}{\out{</div>}}
+}
+
+\subsection{Details}{
+Remove all descriptions that do not have a index associated.
+}
+
+\subsection{Returns}{
+a list of index names which have been removed from descriptions.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+# remove the description of 'test' index
+kc$clean_descriptions()
+}
+
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-describe"></a>}}
+\if{latex}{\out{\hypertarget{method-describe}{}}}
+\subsection{Method \code{describe()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Kibior$describe(index_name, columns = NULL, pretty = FALSE)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{index_name}}{the index name to describe}
+
+\item{\code{columns}}{a vector of column names to describe (default: NULL)}
+
+\item{\code{pretty}}{pretty-print the result (default: FALSE)}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Details}{
+Get the description of indices and their columns.
+}
+
+\subsection{Returns}{
+all description, grouped by indices
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+kc$describe("s*")
+kc$describe("sw", columns = c("name", "height"))
+}
+
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-describe_index"></a>}}
+\if{latex}{\out{\hypertarget{method-describe_index}{}}}
+\subsection{Method \code{describe_index()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Kibior$describe_index(index_name)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{index_name}}{the index name to describe}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Details}{
+Get the description text of indices.
+}
+
+\subsection{Returns}{
+a list of description text, grouped by indices
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+kc$describe_index("s*")
+}
+
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-describe_columns"></a>}}
+\if{latex}{\out{\hypertarget{method-describe_columns}{}}}
+\subsection{Method \code{describe_columns()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Kibior$describe_columns(index_name, columns)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{index_name}}{the index name to describe}
+
+\item{\code{columns}}{a vector of column names to describe}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Details}{
+Get the description text of index columns.
+}
+
+\subsection{Returns}{
+a list of description text, grouped by indices
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+kc$describe_columns("s*", c("name", "height"))
+}
+
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-infos"></a>}}
+\if{latex}{\out{\hypertarget{method-infos}{}}}
+\subsection{Method \code{infos()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Kibior$infos()}\if{html}{\out{</div>}}
+}
+
+\subsection{Details}{
+Get informations about Elasticsearch cluster
 }
 
 \subsection{Returns}{
@@ -1034,7 +1753,9 @@ a list of statistics about the cluster
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{kc$stats()
+\preformatted{\dontrun{
+kc$infos()
+}
 
 }
 \if{html}{\out{</div>}}
@@ -1059,47 +1780,9 @@ the ping result with some basic infos
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{kc$ping()
-
+\preformatted{\dontrun{
+kc$ping()
 }
-\if{html}{\out{</div>}}
-
-}
-
-}
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-metadata"></a>}}
-\if{latex}{\out{\hypertarget{method-metadata}{}}}
-\subsection{Method \code{metadata()}}{
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Kibior$metadata(index_name)}\if{html}{\out{</div>}}
-}
-
-\subsection{Arguments}{
-\if{html}{\out{<div class="arguments">}}
-\describe{
-\item{\code{index_name}}{a vector of index names to get metadata (default: NULL).}
-}
-\if{html}{\out{</div>}}
-}
-\subsection{Details}{
-Get metadata of indices
-}
-
-\subsection{Returns}{
-the list of indices, each containing the 3 features (mappings,settings, aliases)
-}
-\subsection{Examples}{
-\if{html}{\out{<div class="r example copy">}}
-\preformatted{# push test data, without magrittr
-kc$push(dplyr::starwars, "sw")
-kc$push(dplyr::filter(dplyr::starwars, homeworld == "Naboo"), "sw_naboo")
-kc$push(dplyr::filter(dplyr::starwars, homeworld == "Tatooine"), "sw_tatooine")
-kc$push(dplyr::filter(dplyr::starwars, homeworld == "Alderaan"), "sw_alderaan")
-# metadata
-kc$metadata()
-kc$metadata("sw")
-kc$metadata(c("sw", "sw_naboo"))
 
 }
 \if{html}{\out{</div>}}
@@ -1131,9 +1814,11 @@ the list of indices, containing their mapping
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{kc$mappings()
+\preformatted{\dontrun{
+kc$mappings()
 kc$mappings("sw")
 kc$mappings(c("sw", "sw_naboo"))
+}
 
 }
 \if{html}{\out{</div>}}
@@ -1165,9 +1850,11 @@ the list of indices, containing their settings
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{kc$settings()
+\preformatted{\dontrun{
+kc$settings()
 kc$settings("sw")
 kc$settings(c("sw", "sw_tatooine"))
+}
 
 }
 \if{html}{\out{</div>}}
@@ -1199,9 +1886,83 @@ the list of indices, containing their aliases
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{kc$aliases()
+\preformatted{\dontrun{
+kc$aliases()
 kc$aliases("sw")
 kc$aliases(c("sw", "sw_alderaan"))
+}
+
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-dim"></a>}}
+\if{latex}{\out{\hypertarget{method-dim}{}}}
+\subsection{Method \code{dim()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Kibior$dim(index_name)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{index_name}}{a vector of index names to get aliases.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Details}{
+Shortcut to `$count()` to match the classical `dim()` function pattern `[line col]`
+}
+
+\subsection{Returns}{
+the list of indices, containing their number of observations and variables.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+# Couple [<nb obs> <nb var>] in "sw"
+kc$dim("sw")
+# Couple [<nb obs> <nb var>] in indices "sw_naboo" and "sw_alderaan"
+kc$dim(c("sw_naboo", "sw_alderaan"))
+}
+
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-columns"></a>}}
+\if{latex}{\out{\hypertarget{method-columns}{}}}
+\subsection{Method \code{columns()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Kibior$columns(index_name)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{index_name}}{a vector of index names, can be a pattern.}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Details}{
+Get fields/columns of indices.
+}
+
+\subsection{Returns}{
+a list of indices, each containing their fields/columns.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+kc$columns("sw")          # direct search
+kc$columns("sw_*")        # pattern search
+}
 
 }
 \if{html}{\out{</div>}}
@@ -1239,12 +2000,14 @@ the list of indices, containing their number of observations or variables.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{# Number of observations (nb of records) in "sw"
+\preformatted{\dontrun{
+# Number of observations (nb of records) in "sw"
 kc$count("sw")
 # Number of observations in indices "sw_naboo" and "sw_tatooine"
 kc$count(c("sw_naboo", "sw_tatooine"))
 # Number of variables (nb of columns) in index "sw_naboo"
 kc$count("sw_naboo", type = "variables")
+}
 
 }
 \if{html}{\out{</div>}}
@@ -1253,33 +2016,41 @@ kc$count("sw_naboo", type = "variables")
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-dim"></a>}}
-\if{latex}{\out{\hypertarget{method-dim}{}}}
-\subsection{Method \code{dim()}}{
+\if{html}{\out{<a id="method-avg"></a>}}
+\if{latex}{\out{\hypertarget{method-avg}{}}}
+\subsection{Method \code{avg()}}{
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Kibior$dim(index_name)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{Kibior$avg(index_name, columns, query = NULL)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{index_name}}{a vector of index names to get aliases.}
+\item{\code{index_name}}{a vector of index names.}
+
+\item{\code{columns}}{a vector of column names.}
+
+\item{\code{query}}{a string as a query string syntax (default: NULL).}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Details}{
-Shortcut to `$count()` to match the classical `dim()` function pattern `[line col]`
+Get the average of numeric columns.
 }
 
 \subsection{Returns}{
-the list of indices, containing their number of observations and variables.
+a tibble with avg, one line by matching index and column.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{# Couple [<nb obs> <nb var>] in "sw"
-kc$dim("sw")
-# Couple [<nb obs> <nb var>] in indices "sw_naboo" and "sw_alderaan"
-kc$dim(c("sw_naboo", "sw_alderaan"))
+\preformatted{\dontrun{
+# Avg of "sw" column "height"
+kc$avg("sw", "height")
+# if pattern
+kc$avg("s*", "height")
+# multiple indices, multiple columns
+kc$avg(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+}
 
 }
 \if{html}{\out{</div>}}
@@ -1288,31 +2059,491 @@ kc$dim(c("sw_naboo", "sw_alderaan"))
 
 }
 \if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-columns"></a>}}
-\if{latex}{\out{\hypertarget{method-columns}{}}}
-\subsection{Method \code{columns()}}{
+\if{html}{\out{<a id="method-mean"></a>}}
+\if{latex}{\out{\hypertarget{method-mean}{}}}
+\subsection{Method \code{mean()}}{
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Kibior$columns(index_name)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{Kibior$mean(index_name, columns, query = NULL)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
-\item{\code{index_name}}{a vector of index names, can be a pattern.}
+\item{\code{index_name}}{a vector of index names.}
+
+\item{\code{columns}}{a vector of column names.}
+
+\item{\code{query}}{a string as a query string syntax (default: NULL).}
 }
 \if{html}{\out{</div>}}
 }
 \subsection{Details}{
-Get fields/columns of indices.
+Get the mean of numeric columns.
 }
 
 \subsection{Returns}{
-a list of indices, each containing their fields/columns.
+a tibble with mean, one line by matching index and column.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{kc$columns("sw")          # direct search
-kc$columns("sw_*")        # pattern search
+\preformatted{\dontrun{
+# mean of "sw" column "height"
+kc$mean("sw", "height")
+# if pattern
+kc$mean("s*", "height")
+# multiple indices, multiple columns
+kc$mean(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+}
+
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-min"></a>}}
+\if{latex}{\out{\hypertarget{method-min}{}}}
+\subsection{Method \code{min()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Kibior$min(index_name, columns, query = NULL)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{index_name}}{a vector of index names.}
+
+\item{\code{columns}}{a vector of column names.}
+
+\item{\code{query}}{a string as a query string syntax (default: NULL).}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Details}{
+Get the minimum of numeric columns.
+}
+
+\subsection{Returns}{
+a tibble with min, one line by matching index and column.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+# min of "sw" column "height"
+kc$min("sw", "height")
+# if pattern
+kc$min("s*", "height")
+# multiple indices, multiple columns
+kc$min(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+}
+
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-max"></a>}}
+\if{latex}{\out{\hypertarget{method-max}{}}}
+\subsection{Method \code{max()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Kibior$max(index_name, columns, query = NULL)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{index_name}}{a vector of index names.}
+
+\item{\code{columns}}{a vector of column names.}
+
+\item{\code{query}}{a string as a query string syntax (default: NULL).}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Details}{
+Get the maximum of numeric columns.
+}
+
+\subsection{Returns}{
+a tibble with max, one line by matching index and column.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+# max of "sw" column "height"
+kc$max("sw", "height")
+# if pattern
+kc$max("s*", "height")
+# multiple indices, multiple columns
+kc$max(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+}
+
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-sum"></a>}}
+\if{latex}{\out{\hypertarget{method-sum}{}}}
+\subsection{Method \code{sum()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Kibior$sum(index_name, columns, query = NULL)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{index_name}}{a vector of index names.}
+
+\item{\code{columns}}{a vector of column names.}
+
+\item{\code{query}}{a string as a query string syntax (default: NULL).}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Details}{
+Get the sum of numeric columns.
+}
+
+\subsection{Returns}{
+a tibble with sum, one line by matching index and column.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+# sum of "sw" column "height"
+kc$sum("sw", "height")
+# if pattern
+kc$sum("s*", "height")
+# multiple indices, multiple columns
+kc$sum(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+}
+
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-stats"></a>}}
+\if{latex}{\out{\hypertarget{method-stats}{}}}
+\subsection{Method \code{stats()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Kibior$stats(index_name, columns, sigma = NULL, query = NULL)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{index_name}}{a vector of index names.}
+
+\item{\code{columns}}{a vector of column names.}
+
+\item{\code{sigma}}{(default: NULL).}
+
+\item{\code{query}}{a string as a query string syntax (default: NULL).}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Details}{
+Produces descriptive statistics of a column.
+Returns a tibble composed of: count, min, max, avg, sum, 
+ sum_of_squares, variance, std_deviation (+ upper and lower bounds).
+Multiple warnings here. One for the count and one for the std_dev.
+1/ Counts: they are approximate, see vignette.
+2/ Std dev: as stated in ES documentation: "The standard deviation 
+and its bounds are displayed by default, but they are not always 
+applicable to all data-sets. Your data must be normally distributed 
+for the metrics to make sense. The statistics behind standard 
+deviations assumes normally distributed data, so if your data is 
+skewed heavily left or right, the value returned will be misleading."
+}
+
+\subsection{Returns}{
+a tibble with descriptive stats, one line by matching index.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+# Stats of "sw" column "height"
+kc$stats("sw", "height")
+# if pattern
+kc$stats("s*", "height")
+# multiple indices and sigma definition
+kc$stats(c("sw", "sw2"), "height", sigma = 2.5)
+# multiple indices, multiple columns
+kc$stats(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+}
+
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-percentiles"></a>}}
+\if{latex}{\out{\hypertarget{method-percentiles}{}}}
+\subsection{Method \code{percentiles()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Kibior$percentiles(index_name, columns, percents = NULL, query = NULL)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{index_name}}{a vector of index names.}
+
+\item{\code{columns}}{a vector of column names.}
+
+\item{\code{percents}}{a numeric vector of pecents to use (default: NULL).}
+
+\item{\code{query}}{a string as a query string syntax (default: NULL).}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Details}{
+Get percentiles of numeric columns.
+}
+
+\subsection{Returns}{
+a list of tibble, splitted by indices with percentiles inside tibble columns.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+# percentiles of "sw" column "height", default is with q1, q2 and q3
+kc$percentiles("sw", "height")
+# if pattern
+kc$percentiles("s*", "height")
+# defining percents to get
+kc$percentiles("s*", "height", percents = c(20, 25))
+# multiple indices, multiple columns
+kc$percentiles(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+}
+
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-q1"></a>}}
+\if{latex}{\out{\hypertarget{method-q1}{}}}
+\subsection{Method \code{q1()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Kibior$q1(index_name, columns, query = NULL)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{index_name}}{a vector of index names.}
+
+\item{\code{columns}}{a vector of column names.}
+
+\item{\code{query}}{a string as a query string syntax (default: NULL).}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Details}{
+Get Q1 percentiles from numeric columns.
+}
+
+\subsection{Returns}{
+a list of tibble, splitted by indices with Q1 inside tibble columns.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+# Q1 of "sw" column "height"
+kc$q1("sw", "height")
+# if pattern
+kc$q1("s*", "height")
+# multiple indices, multiple columns
+kc$q1(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+}
+
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-q2"></a>}}
+\if{latex}{\out{\hypertarget{method-q2}{}}}
+\subsection{Method \code{q2()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Kibior$q2(index_name, columns, query = NULL)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{index_name}}{a vector of index names.}
+
+\item{\code{columns}}{a vector of column names.}
+
+\item{\code{query}}{a string as a query string syntax (default: NULL).}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Details}{
+Get Q2 percentiles from numeric columns.
+}
+
+\subsection{Returns}{
+a list of tibble, splitted by indices with Q2 inside tibble columns.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+# Q2 of "sw" column "height"
+kc$q2("sw", "height")
+# if pattern
+kc$q2("s*", "height")
+# multiple indices, multiple columns
+kc$q2(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+}
+
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-median"></a>}}
+\if{latex}{\out{\hypertarget{method-median}{}}}
+\subsection{Method \code{median()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Kibior$median(index_name, columns, query = NULL)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{index_name}}{a vector of index names.}
+
+\item{\code{columns}}{a vector of column names.}
+
+\item{\code{query}}{a string as a query string syntax (default: NULL).}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Details}{
+Get median from numeric columns.
+Basically a wrapper around `$q2()`.
+}
+
+\subsection{Returns}{
+a list of tibble, splitted by indices with median inside tibble columns.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+# median of "sw" column "height"
+kc$median("sw", "height")
+# if pattern
+kc$median("s*", "height")
+# multiple indices, multiple columns
+kc$median(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+}
+
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-q3"></a>}}
+\if{latex}{\out{\hypertarget{method-q3}{}}}
+\subsection{Method \code{q3()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Kibior$q3(index_name, columns, query = NULL)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{index_name}}{a vector of index names.}
+
+\item{\code{columns}}{a vector of column names.}
+
+\item{\code{query}}{a string as a query string syntax (default: NULL).}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Details}{
+Get Q3 percentiles from numeric columns.
+}
+
+\subsection{Returns}{
+a list of tibble, splitted by indices with Q3 inside tibble columns.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+# Q3 of "sw" column "height"
+kc$q3("sw", "height")
+# if pattern
+kc$q3("s*", "height")
+# multiple indices, multiple columns
+kc$q3(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+}
+
+}
+\if{html}{\out{</div>}}
+
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-summary"></a>}}
+\if{latex}{\out{\hypertarget{method-summary}{}}}
+\subsection{Method \code{summary()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Kibior$summary(index_name, columns, query = NULL)}\if{html}{\out{</div>}}
+}
+
+\subsection{Arguments}{
+\if{html}{\out{<div class="arguments">}}
+\describe{
+\item{\code{index_name}}{a vector of index names.}
+
+\item{\code{columns}}{a vector of column names.}
+
+\item{\code{query}}{a string as a query string syntax (default: NULL).}
+}
+\if{html}{\out{</div>}}
+}
+\subsection{Details}{
+Summary for numeric columns.
+Cumulates `$min()`, `$max()`, `$q1()`, `$q2()`, `$q3()`.
+}
+
+\subsection{Returns}{
+a list of tibble, splitted by indices.
+}
+\subsection{Examples}{
+\if{html}{\out{<div class="r example copy">}}
+\preformatted{\dontrun{
+# summary of "sw" column "height"
+kc$summary("sw", "height")
+# if pattern
+kc$summary("s*", "height")
+# multiple indices, multiple columns
+kc$summary(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+}
 
 }
 \if{html}{\out{</div>}}
@@ -1348,8 +2579,10 @@ a vector of keys values from this field/column
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{kc$keys("sw", "name")
+\preformatted{\dontrun{
+kc$keys("sw", "name")
 kc$keys("sw", "eye_color")
+}
 
 }
 \if{html}{\out{</div>}}
@@ -1382,10 +2615,12 @@ a tibble of BAM data
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{dd_bai <- system.file("extdata", "test.bam.bai", package = "kibior")
+\preformatted{\dontrun{
+dd_bai <- system.file("extdata", "test.bam.bai", package = "kibior")
 bam_param <- Rsamtools::ScanBamParam(what = c("pos", "qwidth"))
 bam_data <- Rsamtools::scanBam(dd_bai, param = bam_param)
 kc$bam_to_tibble(bam_data)
+}
 
 }
 \if{html}{\out{</div>}}
@@ -1429,7 +2664,9 @@ a cast or the unchanged data.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{kc$soft_cast(datasets::iris)
+\preformatted{\dontrun{
+kc$soft_cast(datasets::iris)
+}
 
 }
 \if{html}{\out{</div>}}
@@ -1442,13 +2679,15 @@ a cast or the unchanged data.
 \if{latex}{\out{\hypertarget{method-get_resource}{}}}
 \subsection{Method \code{get_resource()}}{
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Kibior$get_resource(url_or_filepath)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{Kibior$get_resource(url_or_filepath, fileext = NULL)}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
 \if{html}{\out{<div class="arguments">}}
 \describe{
 \item{\code{url_or_filepath}}{a filepath or an URL.}
+
+\item{\code{fileext}}{the file extension (default: NULL).}
 }
 \if{html}{\out{</div>}}
 }
@@ -1463,8 +2702,10 @@ a filepath.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{kc$get_resource(system.file("R", "kibior.R", package = "kibior"))
+\preformatted{\dontrun{
+kc$get_resource(system.file("R", "kibior.R", package = "kibior"))
 kc$get_resource("https://ftp.ncbi.nlm.nih.gov/entrez/README")
+}
 
 }
 \if{html}{\out{</div>}}
@@ -1504,11 +2745,13 @@ the filepath if correctly exported, else an error
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{f <- tempfile(fileext=".csv")
+\preformatted{\dontrun{
+f <- tempfile(fileext=".csv")
 # export and overwrite last file with the same data from Elasticsearch
 kc$export(data = "sw", filepath = f)
 # export from in-memory data to a file
 kc$export(data = dplyr::starwars, filepath = f, force = TRUE)
+}
 
 }
 \if{html}{\out{</div>}}
@@ -1521,7 +2764,7 @@ kc$export(data = dplyr::starwars, filepath = f, force = TRUE)
 \if{latex}{\out{\hypertarget{method-import_tabular}{}}}
 \subsection{Method \code{import_tabular()}}{
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Kibior$import_tabular(filepath, to_tibble = TRUE)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{Kibior$import_tabular(filepath, to_tibble = TRUE, fileext = ".csv")}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
@@ -1531,6 +2774,8 @@ kc$export(data = dplyr::starwars, filepath = f, force = TRUE)
 
 \item{\code{to_tibble}}{returns the result as tibble? If FALSE, the raw default rio::import() 
 format will be used (default: TRUE).}
+
+\item{\code{fileext}}{the file extension (default: ".csv").}
 }
 \if{html}{\out{</div>}}
 }
@@ -1544,12 +2789,14 @@ data contained in the file as a tibble, or NULL.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{f <- tempfile(fileext = ".csv")
+\preformatted{\dontrun{
+f <- tempfile(fileext = ".csv")
 rio::export(ggplot2::diamonds, f)
 # import to in-memory variable
 kc$import_tabular(filepath = f)
 # import raw data
 kc$import_tabular(filepath = f, to_tibble = FALSE)
+}
 
 }
 \if{html}{\out{</div>}}
@@ -1562,7 +2809,7 @@ kc$import_tabular(filepath = f, to_tibble = FALSE)
 \if{latex}{\out{\hypertarget{method-import_features}{}}}
 \subsection{Method \code{import_features()}}{
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Kibior$import_features(filepath, to_tibble = TRUE)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{Kibior$import_features(filepath, to_tibble = TRUE, fileext = ".gtf")}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
@@ -1572,6 +2819,8 @@ kc$import_tabular(filepath = f, to_tibble = FALSE)
 
 \item{\code{to_tibble}}{returns the result as tibble? If FALSE, the raw default 
 rtracklayer::import() format will be used (default: TRUE).}
+
+\item{\code{fileext}}{the file extension (default: ".gtf").}
 }
 \if{html}{\out{</div>}}
 }
@@ -1585,7 +2834,8 @@ data contained in the file as a tibble, or NULL.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{# get sample files
+\preformatted{\dontrun{
+# get sample files
 f_gff <- system.file("extdata", "chr_y.gff3.gz", package = "kibior")
 f_bed <- system.file("extdata", "cpg.bed", package = "kibior")
 # import to in-memory variable
@@ -1594,6 +2844,7 @@ kc$import_features(filepath = f_gff)
 # import raw data
 kc$import_features(filepath = f_bed, to_tibble = FALSE)
 kc$import_features(filepath = f_gff, to_tibble = FALSE)
+}
 
 }
 \if{html}{\out{</div>}}
@@ -1606,7 +2857,7 @@ kc$import_features(filepath = f_gff, to_tibble = FALSE)
 \if{latex}{\out{\hypertarget{method-import_alignments}{}}}
 \subsection{Method \code{import_alignments()}}{
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Kibior$import_alignments(filepath, to_tibble = TRUE)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{Kibior$import_alignments(filepath, to_tibble = TRUE, fileext = ".bam")}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
@@ -1616,6 +2867,8 @@ kc$import_features(filepath = f_gff, to_tibble = FALSE)
 
 \item{\code{to_tibble}}{returns the result as tibble? If FALSE, the raw default 
 Rsamtools::scanBam() format will be used (default: TRUE).}
+
+\item{\code{fileext}}{the file extension (default: ".bam").}
 }
 \if{html}{\out{</div>}}
 }
@@ -1629,12 +2882,14 @@ data contained in the file as a tibble, or NULL.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{# get sample file
+\preformatted{\dontrun{
+# get sample file
 f_bai <- system.file("extdata", "test.bam.bai", package = "kibior")
 # import to in-memory variable
 kc$import_alignments(filepath = f_bai)
 # import raw data
 kc$import_alignments(filepath = f_bai, to_tibble = FALSE)
+}
 
 }
 \if{html}{\out{</div>}}
@@ -1647,7 +2902,7 @@ kc$import_alignments(filepath = f_bai, to_tibble = FALSE)
 \if{latex}{\out{\hypertarget{method-import_json}{}}}
 \subsection{Method \code{import_json()}}{
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Kibior$import_json(filepath, to_tibble = TRUE)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{Kibior$import_json(filepath, to_tibble = TRUE, fileext = ".json")}\if{html}{\out{</div>}}
 }
 
 \subsection{Arguments}{
@@ -1657,6 +2912,8 @@ kc$import_alignments(filepath = f_bai, to_tibble = FALSE)
 
 \item{\code{to_tibble}}{returns the result as tibble? If FALSE, the raw dataframe format 
 will be used (default: TRUE).}
+
+\item{\code{fileext}}{the file extension (default: ".json").}
 }
 \if{html}{\out{</div>}}
 }
@@ -1669,12 +2926,14 @@ data contained in the file as a tibble, dataframe or NULL.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{# get sample file
+\preformatted{\dontrun{
+# get sample file
 f_json <- system.file("extdata", "storms100.json", package = "kibior")
 # import to in-memory variable
 kc$import_json(f_json)
 # import raw data
 kc$import_json(f_json, to_tibble = FALSE)
+}
 
 }
 \if{html}{\out{</div>}}
@@ -1698,7 +2957,8 @@ kc$import_json(f_json, to_tibble = FALSE)
 \item{\code{to_tibble}}{returns the result as tibble? If FALSE, the raw default 
 Rsamtools::scanBam() format will be used (default: TRUE).}
 
-\item{\code{fasta_type}}{type of parsing. It can be "dna", "rna", "aa" ou "auto" (default: "auto")}
+\item{\code{fasta_type}}{type of parsing. It can be "dna", "rna", "aa" ou "auto" (default: 
+"auto")}
 }
 \if{html}{\out{</div>}}
 }
@@ -1712,7 +2972,8 @@ data contained in the file as a tibble, or NULL.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{# get sample file
+\preformatted{\dontrun{
+# get sample file
 f_dna <- system.file("extdata", "dna_human_y.fa.gz", package = "kibior")
 f_rna <- system.file("extdata", "ncrna_mus_musculus.fa.gz", package = "kibior")
 f_aa <- system.file("extdata", "pep_mus_spretus.fa.gz", package = "kibior")
@@ -1722,6 +2983,7 @@ kc$import_sequences(filepath = f_dna, fasta_type = "dna")
 kc$import_sequences(filepath = f_rna, to_tibble = FALSE, fasta_type = "rna")
 # import auto
 kc$import_sequences(filepath = f_aa)
+}
 
 }
 \if{html}{\out{</div>}}
@@ -1759,7 +3021,8 @@ data contained in the file, or NULL.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{# get sample file
+\preformatted{\dontrun{
+# get sample file
 f_dna <- system.file("extdata", "dna_human_y.fa.gz", package = "kibior")
 f_rna <- system.file("extdata", "ncrna_mus_musculus.fa.gz", package = "kibior")
 f_aa <- system.file("extdata", "pep_mus_spretus.fa.gz", package = "kibior")
@@ -1773,6 +3036,7 @@ kc$guess_import(f_aa)
 kc$guess_import(f_bai)
 kc$guess_import(f_gff)
 kc$guess_import(f_bed)
+}
 
 }
 \if{html}{\out{</div>}}
@@ -1800,7 +3064,8 @@ kc$guess_import(f_bed)
 \describe{
 \item{\code{filepath}}{the filepath to use as import, must contain the file extention.}
 
-\item{\code{import_type}}{can be one of "auto", "tabular", "features", "alignments", "sequences" (default: "auto").}
+\item{\code{import_type}}{can be one of "auto", "tabular", "features", "alignments", "sequences" 
+(default: "auto").}
 
 \item{\code{push_index}}{the name of the index where to push data (default: NULL).}
 
@@ -1823,7 +3088,8 @@ data contained in the file, or NULL.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{# get sample file
+\preformatted{\dontrun{
+# get sample file
 f_aa <- system.file("extdata", "pep_mus_spretus.fa.gz", package = "kibior")
 f_gff <- system.file("extdata", "chr_y.gff3.gz", package = "kibior")
 f_bai <- system.file("extdata", "test.bam.bai", package = "kibior")
@@ -1834,6 +3100,7 @@ kc$import(filepath = f_bai, push_index = "sw_from_file")
 # import to index by recreating it, then pull indexed data
 kc$import(filepath = f_gff, push_index = "sw_from_file",
  push_mode = "recreate")
+}
 
 }
 \if{html}{\out{</div>}}
@@ -1875,7 +3142,8 @@ the index_name given if the push ended well, else an error.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{# erase the last push data by recreating the index and re-pushing data
+\preformatted{\dontrun{
+# erase the last push data by recreating the index and re-pushing data
 kc$push(dplyr::starwars, index_name = "sw", mode = "recreate")
 # characters names are unique, can be used as ID
 kc$push(dplyr::starwars, index_name = "sw", mode = "recreate", id_col = "name")
@@ -1888,6 +3156,7 @@ some_new_data["gender"] <- "female"
 kc$push(some_new_data, "sw", mode = "update", id_col = "name")
 # view result by querying
 kc$pull("sw", query = "height:>180", columns = c("name", "gender"))
+}
 
 }
 \if{html}{\out{</div>}}
@@ -1947,7 +3216,8 @@ a list of datasets corresponding to the pull request, else an error. Keys of the
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{# push some data sample
+\preformatted{\dontrun{
+# push some data sample
 kc$push(dplyr::storms, "storms")
 # get the whole "sw" index
 kc$pull("sw")
@@ -1965,6 +3235,7 @@ r <- kc$pull("sw", query = "height:>180 && homeworld:(Tatooine || Naboo)")
 # it can be used in conjunction with `columns` to select only columns that matter
 r <- kc$pull("sw", query = "height:>180 && homeworld:(Tatooine || Naboo)", columns = 
  c("name", "hair_color", "homeworld"))
+}
 
 }
 \if{html}{\out{</div>}}
@@ -2013,11 +3284,13 @@ the reindex result
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{kc$push(dplyr::starwars, "sw", mode = "recreate")
+\preformatted{\dontrun{
+kc$push(dplyr::starwars, "sw", mode = "recreate")
 # move data from an index to another (change name, same instance)
 r <- kc$move(from_index = "sw", to_index = "sw_new")
 kc$pull("sw_new")
-kc$list() 
+kc$list()
+} 
 
 }
 \if{html}{\out{</div>}}
@@ -2058,10 +3331,12 @@ the reindex result
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{# copy data from one index to another (same instance)
+\preformatted{\dontrun{
+# copy data from one index to another (same instance)
 r <- kc$copy(from_index = "sw_new", to_index = "sw")
 kc$pull(c("sw", "sw_new"))
-kc$list() 
+kc$list()
+} 
 
 }
 \if{html}{\out{</div>}}
@@ -2093,7 +3368,8 @@ a vector of matching index names, NULL if nothing matches.
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{# search "sw" index name
+\preformatted{\dontrun{
+# search "sw" index name
 kc$match("sw")
 # search all starting with an "s"
 kc$match("s*")
@@ -2103,6 +3379,7 @@ kc$match("*")
 kc$match(c("sw", "sw_new", "nope"))
 # search multiple names with pattern
 kc$match(c("s*", "nope"))
+}
 
 }
 \if{html}{\out{</div>}}
@@ -2165,7 +3442,8 @@ a list of datasets corresponding to the pull request, else an error. Keys of the
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{# search "sw" index, head mode on
+\preformatted{\dontrun{
+# search "sw" index, head mode on
 kc$search("sw")
 # search "sw" index with all metadata, head mode on
 kc$search("sw", keep_metadata = TRUE)
@@ -2181,6 +3459,7 @@ kc$search("*", query = "height:>180 && homeworld:(Tatooine || Naboo)")
 # it can be used in conjunction with `columns` to select only columns that matter
 kc$search("*", query = "height:>180 && homeworld:(Tatooine || Naboo)", columns = 
  c("name", "hair_color", "homeworld"))
+}
 
 }
 \if{html}{\out{</div>}}
@@ -2215,7 +3494,8 @@ a tibble
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{# some data for joins examples
+\preformatted{\dontrun{
+# some data for joins examples
 kc$push(ggplot2::diamonds, "diamonds")
 # prepare join datasets, only big the biggest diamonds are selected (9)
 sup_carat <- dplyr::filter(ggplot2::diamonds, carat > 3.5)
@@ -2225,6 +3505,7 @@ kc$inner_join(ggplot2::diamonds, "diamonds_superior")
 # execute a inner_join with one index queried, and one in-memory dataset
 kc$inner_join(ggplot2::diamonds, "diamonds", right_query 
  = "carat:>3.5")
+}
 
 }
 \if{html}{\out{</div>}}
@@ -2259,13 +3540,15 @@ a tibble
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{# prepare join datasets, fair cuts 
+\preformatted{\dontrun{
+# prepare join datasets, fair cuts 
 fair_cut <- dplyr::filter(ggplot2::diamonds, cut == "Fair")  # 1605 lines
 sup_carat <- kc$pull("diamonds_superior")$diamonds_superior
 # execute a full_join with one index and one in-memory dataset
 kc$full_join(fair_cut, "diamonds_superior")
 # execute a full_join with one index queried, and one in-memory dataset
 kc$full_join(sup_carat, "diamonds", right_query = "cut:fair")
+}
 
 }
 \if{html}{\out{</div>}}
@@ -2300,7 +3583,8 @@ a tibble
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{# prepare join datasets, fair cuts 
+\preformatted{\dontrun{
+# prepare join datasets, fair cuts 
 fair_cut <- dplyr::filter(ggplot2::diamonds, cut == "Fair")  # 1605 lines
 sup_carat <- kc$pull("diamonds_superior")$diamonds_superior
 # execute a left_join with one index and one in-memory dataset
@@ -2308,6 +3592,7 @@ kc$left_join(fair_cut, "diamonds_superior")
 # execute a left_join with one index queried, and one in-memory dataset
 kc$left_join(sup_carat, "diamonds", right_query 
  = "cut:fair")
+}
 
 }
 \if{html}{\out{</div>}}
@@ -2342,7 +3627,8 @@ a tibble
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{# prepare join datasets, fair cuts 
+\preformatted{\dontrun{
+# prepare join datasets, fair cuts 
 fair_cut <- dplyr::filter(ggplot2::diamonds, cut == "Fair")  # 1605 lines
 sup_carat <- kc$pull("diamonds_superior")$diamonds_superior
 # execute a right_join with one index and one in-memory dataset
@@ -2350,6 +3636,7 @@ kc$right_join(fair_cut, "diamonds_superior")
 # execute a right_join with one index queried, and one in-memory dataset
 kc$right_join(sup_carat, "diamonds", right_query 
  = "cut:fair")
+}
 
 }
 \if{html}{\out{</div>}}
@@ -2384,7 +3671,8 @@ a tibble
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{# prepare join datasets, fair cuts 
+\preformatted{\dontrun{
+# prepare join datasets, fair cuts 
 fair_cut <- dplyr::filter(ggplot2::diamonds, cut == "Fair")  # 1605 lines
 sup_carat <- kc$pull("diamonds_superior")$diamonds_superior
 # execute a semi_join with one index and one in-memory dataset
@@ -2392,6 +3680,7 @@ kc$semi_join(fair_cut, "diamonds_superior")
 # execute a semi_join with one index queried, and one in-memory dataset
 kc$semi_join(sup_carat, "diamonds", right_query 
  = "cut:fair")
+}
 
 }
 \if{html}{\out{</div>}}
@@ -2426,7 +3715,8 @@ a tibble
 }
 \subsection{Examples}{
 \if{html}{\out{<div class="r example copy">}}
-\preformatted{# prepare join datasets, fair cuts 
+\preformatted{\dontrun{
+# prepare join datasets, fair cuts 
 fair_cut <- dplyr::filter(ggplot2::diamonds, cut == "Fair")  # 1605 lines
 sup_carat <- kc$pull("diamonds_superior")$diamonds_superior
 # execute a anti_join with one index and one in-memory dataset
@@ -2438,6 +3728,7 @@ kc$anti_join(sup_carat, "diamonds", right_query
 # Do not mind this, removing example indices
 elastic::index_delete(kc$connection, "*")
 kc <- NULL
+}
 
 }
 \if{html}{\out{</div>}}

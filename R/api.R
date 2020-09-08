@@ -61,7 +61,6 @@
 #'  \code{verbose} \tab logical \tab verbose mode \tab FALSE \cr
 #'  }
 #'
-
 Kibior <- R6Class(
     c("Kibior", "KibiorOperators"),
     lock_objects = FALSE,
@@ -565,8 +564,9 @@ Kibior <- R6Class(
                 suffix = c("_left", "_right")
             )
             # call to dplyr joins
-            join_type %>%
-                paste0("_join") %>%
+            join_name <- paste0(join_type, "_join")
+            if(self$verbose) message(" -> Executing ", join_name, "...")
+            join_name %>%
                 list("dplyr") %>%
                 do.call(what = "getFromNamespace", args = .) %>%
                 do.call(args = fargs)
@@ -1417,7 +1417,6 @@ Kibior <- R6Class(
         #' kc <- Kibior$new(host = "192.168.2.145", port = 9450, user = "foo", pwd = "bar")
         #' # connect to "elasticsearch:9200"
         #' kc <- Kibior$new("elasticsearch")
-        #' }
         #' 
         #' # get kibior var from env (".Renviron" file or local env) 
         #' dd <- system.file("doc_env", "kibior_build.R", package = "kibior")
@@ -1445,6 +1444,7 @@ Kibior <- R6Class(
         #'     "storms",
         #'     "starwars"
         #' ))
+        #' }
         #'
         initialize = function(host = "localhost", port = 9200, user = NULL, pwd = NULL, verbose = getOption("verbose")){
             if(purrr::is_null(host)) host <- "localhost"
@@ -1476,7 +1476,10 @@ Kibior <- R6Class(
         #' Print simple informations of the current object.
         #'
         #' @examples
+        #' \dontrun{
         #' print(kc)
+        #' }
+        #'
         print = function(){
             f <- function(x) if(x) "yes" else "no"
             cat("KibioR client: \n")
@@ -1490,7 +1493,6 @@ Kibior <- R6Class(
             cat("  - print progressbar:", f(!self$quiet_progress), "\n")
         },
 
-        # TODO test
         #'
         #' @details
         #' Tells if another instance of Kibior has the same `host:port` couple.
@@ -1500,7 +1502,9 @@ Kibior <- R6Class(
         #' @return TRUE if hosts and ports are identical, else FALSE
         #'
         #' @examples
+        #' \dontrun{
         #' kc$eq(kc)
+        #' }
         #'
         eq = function(other = NULL){
             if(!Kibior$is_instance(other)) stop(private$err_not_kibior_instance("other"))
@@ -1508,7 +1512,6 @@ Kibior <- R6Class(
             if(self$quiet_results) invisible(r) else r
         },
 
-        # TODO test
         #'
         #' @details
         #' Tells if another instance of Kibior has a different `host:port` couple.
@@ -1518,7 +1521,9 @@ Kibior <- R6Class(
         #' @return TRUE if hosts and ports are differents, else FALSE
         #'
         #' @examples
+        #' \dontrun{
         #' kc$ne(kc)
+        #' }
         #' 
         ne = function(other = NULL){
             r <- !self$eq(other = other)
@@ -1542,8 +1547,10 @@ Kibior <- R6Class(
         #' @return a list containing results of creation per index
         #'
         #' @examples
+        #' \dontrun{
         #' kc$create("aaa")
         #' kc$create(c("bbb", "ccc"))
+        #' }
         #' 
         create = function(index_name, force = FALSE){
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
@@ -1602,8 +1609,10 @@ Kibior <- R6Class(
         #' @family crud-index
         #'
         #' @examples
+        #' \dontrun{
         #' kc$list()
         #' kc$list(get_specials = TRUE)
+        #' }
         #'
         #' @param get_specials a boolean to get special indices (default: FALSE).
         #'
@@ -1625,8 +1634,10 @@ Kibior <- R6Class(
         #' @family crud-index
         #'
         #' @examples
+        #' \dontrun{
         #' kc$has("aaa")
         #' kc$has(c("bbb", "ccc"))
+        #' }
         #'
         #' @param index_name a vector of index names to check.
         #'
@@ -1654,8 +1665,10 @@ Kibior <- R6Class(
         #' @return a list containing results of deletion per index, or NULL if no index name match
         #'
         #' @examples
+        #' \dontrun{
         #' kc$delete("aaa")
         #' kc$delete(c("bbb", "ccc"))
+        #' }
         #' 
         delete = function(index_name){
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
@@ -1735,16 +1748,19 @@ Kibior <- R6Class(
         #' @param contact a mailto/contact
         #' @param references some paper and other references (e.g. doi, url)
         #' @param columns a list of (column_name = column_description) to register (default: list())
-        #' @param force if FALSE, raise an error if the description already exists, else TRUE to overwrite (default: FALSE)
+        #' @param force if FALSE, raise an error if the description already exists, else TRUE to 
+        #'  overwrite (default: FALSE)
         #'
         #' @return the index name if complete, else an error
         #'
         #' @examples
+        #' \dontrun{
         #' kc$add_description(
         #'     index_name = "sw", 
         #'     dataset_name = "starwars", 
         #'     source_name = "Package dplyr", 
-        #'     index_description = "Description of starwars characters, the data comes from the Star Wars API.", 
+        #'     index_description = "Description of starwars characters, the data comes from the Star 
+        #'      Wars API.", 
         #'     version = "dplyr (1.0.0)", 
         #'     link = "http://swapi.dev/", 
         #'     direct_download_link = "http://swapi.dev/", 
@@ -1758,8 +1774,11 @@ Kibior <- R6Class(
         #'         "skin_color" = "Skin colors",
         #'         "eye_color" = "Eye colors",
         #'         "birth_year" = "Year born (BBY = Before Battle of Yavin)",
-        #'         "sex" = "The biological sex of the character, namely male, female, hermaphroditic, or none (as in the case for Droids).",
-        #'         "gender" = "The gender role or gender identity of the character as determined by their personality or the way they were progammed (as in the case for Droids).",
+        #'         "sex" = "The biological sex of the character, namely male, female, 
+        #'              hermaphroditic, or none (as in the case for Droids).",
+        #'         "gender" = "The gender role or gender identity of the character as determined by 
+        #'              their personality or the way they were progammed (as in the case for Droids
+        #'              ).",
         #'         "homeworld" = "Name of homeworld",
         #'         "species" = "Name of species",
         #'         "films" = "List of films the character appeared in",
@@ -1767,6 +1786,7 @@ Kibior <- R6Class(
         #'         "starships" = "List of starships the character has piloted"
         #'     )
         #' )
+        #' }
         #' 
         add_description = function(index_name, dataset_name, source_name, index_description, version, change_log, website, direct_download, version_date, license, contact, references, columns = list(), force = FALSE){
             # check
@@ -1802,7 +1822,9 @@ Kibior <- R6Class(
             }
             actual_cols <- suppressMessages({ self$columns(index_name)[[index_name]] }) %>% 
                 (function(x) x[x != self$default_id_col])
-            if(length(actual_cols) != length(columns)) stop("argument 'columns' must have the same number of columns as in its index")
+            if(length(actual_cols) != length(columns)){
+                stop("argument 'columns' must have the same number of columns as in its index. It does not take '", self$default_id_col, "' into account.")
+            }
             sd <- private$symmetric_difference(actual_cols, names(columns))
             if(!purrr::is_null(sd)){
                 sd %>% 
@@ -1820,7 +1842,7 @@ Kibior <- R6Class(
             if(self$verbose) message(" -> Getting actual descriptions")
             data <- suppressMessages({ 
                 self$pull(private$.KIBIOR_METADATA_INDICES)[[private$.KIBIOR_METADATA_INDICES]]
-            })
+            }) 
             if(index_name %in% data$index_name){
                 if(!force){
                     stop("index '", index_name ,"' description is already registered. Use 'force' to overwrite.")
@@ -1856,10 +1878,10 @@ Kibior <- R6Class(
                 }) %>% 
                 data.table::rbindlist() %>%
                 as.data.frame(stringsAsFactors = FALSE) %>% 
-                dplyr::inner_join(meta_index, by = "index_name")
+                dplyr::right_join(meta_index, by = "index_name")
             # 
             if(self$verbose) message(" -> Pushing new description for '", index_name, "'")
-            res <- suppressMessages({
+            suppressMessages({
                 data %>% 
                     (function(d){
                         if(purrr::is_null(d)){
@@ -1870,7 +1892,7 @@ Kibior <- R6Class(
                                 rbind(new_data)
                         }
                     }) %>% 
-                    self$push(private$.KIBIOR_METADATA_INDICES, mode = "recreate") 
+                    self$push(private$.KIBIOR_METADATA_INDICES, mode = "recreate")
             })
             # 
             if(self$quiet_results) invisible(index_name) else index_name
@@ -1887,17 +1909,112 @@ Kibior <- R6Class(
         #'  found, else FALSE. Removes unknown index names.
         #'
         #' @examples
+        #' \dontrun{
         #' kc$has_description("s*")
         #' kc$has_description(c("sw", "asdf"))
+        #' }
         #' 
         has_description = function(index_name){
-            i <- self$match(index_name)
+            if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
+            if(private$is_search_pattern(index_name)) stop(private$err_search_pattern_forbidden("index_name"))
+            if(length(index_name) > 1) stop(private$err_one_value("index_name"))
+            #
+            i <- suppressMessages({ self$match(index_name) })
             if(purrr::is_null(i)) stop("No index found with these names or pattern.")
             n <- private$.KIBIOR_METADATA_INDICES
-            tmp <- suppressMessages({ self$pull(n)[[n]]$index_name }) %>% unique()
+            tmp <- suppressMessages({ self$keys(n, "index_name") })
             res <- i %>% lapply(function(d){ d %in% tmp })
             names(res) <- i
-            res
+            if(self$quiet_results) invisible(index_name) else index_name
+        },
+
+        #' @details
+        #' List indices that do no have descriptions.
+        #'
+        #' @family kibior-metadata
+        #'
+        #' @return a vector of indices not present in description.
+        #'
+        #' @examples
+        #' \dontrun{
+        #' kc$missing_descriptions()
+        #' }
+        #' 
+        missing_descriptions = function(){
+            tmp <- suppressMessages({ self$list() })
+            indices <- suppressMessages({ self$keys(private$.KIBIOR_METADATA_INDICES, "index_name") })
+            res <- tmp[!tmp %in% indices]
+            if(self$quiet_results) invisible(res) else res
+        },
+
+        #' @details
+        #' Remove a description.
+        #'
+        #' @family kibior-metadata
+        #'
+        #' @param index_name the index name to describe
+        #'
+        #' @return a vector of indices not present in description.
+        #'
+        #' @examples
+        #' \dontrun{
+        #' # remove the description of 'test' index
+        #' kc$remove_description("test")
+        #' }
+        #' 
+        remove_description = function(index_name){
+            if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
+            if(private$is_search_pattern(index_name)) stop(private$err_search_pattern_forbidden("index_name"))
+            if(length(index_name) > 1) stop(private$err_one_value("index_name"))
+            #
+            n <- private$.KIBIOR_METADATA_INDICES
+            is_describe <- suppressMessages({ self$keys(n, "index_name") }) %>% { index_name %in% . }
+            if(!is_describe){
+                stop("No description found for index '", index_name, "'.")
+            }
+            tmp <- suppressMessages({ self$pull(n)[[n]] }) %>% 
+                dplyr::filter(index_name != !!index_name)
+            res <- tryCatch(
+                expr = {
+                    tmp %>% dplyr::select(-c(self$default_id_col))
+                }, 
+                error = function(e){
+                    message(e)
+                    tmp
+                }
+            )
+            suppressMessages({ self$push(res, n, mode = "recreate") })
+            if(self$quiet_results) invisible(index_name) else index_name
+        },
+
+
+        #' @details
+        #' Remove all descriptions that do not have a index associated.
+        #'
+        #' @family kibior-metadata
+        #'
+        #' @return a list of index names which have been removed from descriptions.
+        #'
+        #' @examples
+        #' \dontrun{
+        #' # remove the description of 'test' index
+        #' kc$clean_descriptions()
+        #' }
+        #' 
+        clean_descriptions = function(){
+            # get all description entries that do not have index associated
+            tmp <- suppressMessages({ self$keys(private$.KIBIOR_METADATA_INDICES, "index_name") })
+            description_names <- suppressMessages({ tmp[!tmp %in% self$list()] })
+            if(length(description_names) == 0){
+                if(self$verbose) message("No obsolete description found.")
+                res <- NULL
+            } else {
+                if(self$verbose) message("Removing obsolete index descriptions: ", private$vector_to_str(description_names))
+                res <- description_names %>% 
+                    lapply(self$remove_description) %>% 
+                    unlist(use.names = FALSE)
+            }
+            if(self$quiet_results) invisible(res) else res
         },
 
         #' @details
@@ -1912,8 +2029,10 @@ Kibior <- R6Class(
         #' @return all description, grouped by indices
         #'
         #' @examples
+        #' \dontrun{
         #' kc$describe("s*")
         #' kc$describe("sw", columns = c("name", "height"))
+        #' }
         #' 
         describe = function(index_name, columns = NULL, pretty = FALSE){
             # check
@@ -2021,9 +2140,11 @@ Kibior <- R6Class(
         #' @return a list of description text, grouped by indices
         #'
         #' @examples
-        #' kc$describe_indices("s*")
+        #' \dontrun{
+        #' kc$describe_index("s*")
+        #' }
         #' 
-        describe_indices = function(index_name){
+        describe_index = function(index_name){
             res <- self$describe(index_name)
             if(!purrr::is_null(res)){
                 res <- res %>% 
@@ -2044,7 +2165,9 @@ Kibior <- R6Class(
         #' @return a list of description text, grouped by indices
         #'
         #' @examples
+        #' \dontrun{
         #' kc$describe_columns("s*", c("name", "height"))
+        #' }
         #' 
         describe_columns = function(index_name, columns){
             res <- self$describe(index_name, columns = columns)
@@ -2068,7 +2191,9 @@ Kibior <- R6Class(
         #' @family cluster-wealth
         #'
         #' @examples
+        #' \dontrun{
         #' kc$infos()
+        #' }
         #'
         #' @return a list of statistics about the cluster
         #'
@@ -2085,7 +2210,9 @@ Kibior <- R6Class(
         #' @family cluster-wealth
         #'
         #' @examples
+        #' \dontrun{
         #' kc$ping()
+        #' }
         #'
         #' @return the ping result with some basic infos
         #'
@@ -2104,9 +2231,11 @@ Kibior <- R6Class(
         #' @family crud-metadata
         #'
         #' @examples
+        #' \dontrun{
         #' kc$mappings()
         #' kc$mappings("sw")
         #' kc$mappings(c("sw", "sw_naboo"))
+        #' }
         #'
         #' @param index_name a vector of index names to get mappings.
         #'
@@ -2132,9 +2261,11 @@ Kibior <- R6Class(
         #' @family crud-metadata
         #'
         #' @examples
+        #' \dontrun{
         #' kc$settings()
         #' kc$settings("sw")
         #' kc$settings(c("sw", "sw_tatooine"))
+        #' }
         #'
         #' @param index_name a vector of index names to get settings.
         #'
@@ -2152,9 +2283,11 @@ Kibior <- R6Class(
         #' @family crud-metadata
         #'
         #' @examples
+        #' \dontrun{
         #' kc$aliases()
         #' kc$aliases("sw")
         #' kc$aliases(c("sw", "sw_alderaan"))
+        #' }
         #'
         #' @param index_name a vector of index names to get aliases.
         #'
@@ -2172,10 +2305,12 @@ Kibior <- R6Class(
         #' @family crud-metadata
         #'
         #' @examples
+        #' \dontrun{
         #' # Couple [<nb obs> <nb var>] in "sw"
         #' kc$dim("sw")
         #' # Couple [<nb obs> <nb var>] in indices "sw_naboo" and "sw_alderaan"
         #' kc$dim(c("sw_naboo", "sw_alderaan"))
+        #' }
         #'
         #' @param index_name a vector of index names to get aliases.
         #'
@@ -2206,14 +2341,15 @@ Kibior <- R6Class(
         #' @family crud-metadata
         #'
         #' @examples
+        #' \dontrun{
         #' kc$columns("sw")          # direct search
         #' kc$columns("sw_*")        # pattern search
+        #' }
         #'
         #' @param index_name a vector of index names, can be a pattern.
         #'
         #' @return a list of indices, each containing their fields/columns.
         #'
-        # TODO test
         columns = function(index_name){
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
             # 
@@ -2253,12 +2389,14 @@ Kibior <- R6Class(
         #' @family stats
         #'
         #' @examples
+        #' \dontrun{
         #' # Number of observations (nb of records) in "sw"
         #' kc$count("sw")
         #' # Number of observations in indices "sw_naboo" and "sw_tatooine"
         #' kc$count(c("sw_naboo", "sw_tatooine"))
         #' # Number of variables (nb of columns) in index "sw_naboo"
         #' kc$count("sw_naboo", type = "variables")
+        #' }
         #'
         #' @param index_name a vector of index names to get aliases.
         #' @param type a string representing the type to count: "observations" (lines) or 
@@ -2305,12 +2443,14 @@ Kibior <- R6Class(
         #' @family stats
         #'
         #' @examples
+        #' \dontrun{
         #' # Avg of "sw" column "height"
         #' kc$avg("sw", "height")
         #' # if pattern
         #' kc$avg("s*", "height")
         #' # multiple indices, multiple columns
         #' kc$avg(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+        #' }
         #'
         #' @param index_name a vector of index names.
         #' @param columns a vector of column names.
@@ -2328,12 +2468,14 @@ Kibior <- R6Class(
         #' @family stats
         #'
         #' @examples
+        #' \dontrun{
         #' # mean of "sw" column "height"
         #' kc$mean("sw", "height")
         #' # if pattern
         #' kc$mean("s*", "height")
         #' # multiple indices, multiple columns
         #' kc$mean(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+        #' }
         #'
         #' @param index_name a vector of index names.
         #' @param columns a vector of column names.
@@ -2361,12 +2503,14 @@ Kibior <- R6Class(
         #' @family stats
         #'
         #' @examples
+        #' \dontrun{
         #' # min of "sw" column "height"
         #' kc$min("sw", "height")
         #' # if pattern
         #' kc$min("s*", "height")
         #' # multiple indices, multiple columns
         #' kc$min(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+        #' }
         #'
         #' @param index_name a vector of index names.
         #' @param columns a vector of column names.
@@ -2384,12 +2528,14 @@ Kibior <- R6Class(
         #' @family stats
         #'
         #' @examples
+        #' \dontrun{
         #' # max of "sw" column "height"
         #' kc$max("sw", "height")
         #' # if pattern
         #' kc$max("s*", "height")
         #' # multiple indices, multiple columns
         #' kc$max(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+        #' }
         #'
         #' @param index_name a vector of index names.
         #' @param columns a vector of column names.
@@ -2407,12 +2553,14 @@ Kibior <- R6Class(
         #' @family stats
         #'
         #' @examples
+        #' \dontrun{
         #' # sum of "sw" column "height"
         #' kc$sum("sw", "height")
         #' # if pattern
         #' kc$sum("s*", "height")
         #' # multiple indices, multiple columns
         #' kc$sum(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+        #' }
         #'
         #' @param index_name a vector of index names.
         #' @param columns a vector of column names.
@@ -2440,6 +2588,7 @@ Kibior <- R6Class(
         #' @family stats
         #'
         #' @examples
+        #' \dontrun{
         #' # Stats of "sw" column "height"
         #' kc$stats("sw", "height")
         #' # if pattern
@@ -2448,6 +2597,7 @@ Kibior <- R6Class(
         #' kc$stats(c("sw", "sw2"), "height", sigma = 2.5)
         #' # multiple indices, multiple columns
         #' kc$stats(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+        #' }
         #'
         #' @param index_name a vector of index names.
         #' @param columns a vector of column names.
@@ -2487,6 +2637,7 @@ Kibior <- R6Class(
         #' @family stats
         #'
         #' @examples
+        #' \dontrun{
         #' # percentiles of "sw" column "height", default is with q1, q2 and q3
         #' kc$percentiles("sw", "height")
         #' # if pattern
@@ -2495,6 +2646,7 @@ Kibior <- R6Class(
         #' kc$percentiles("s*", "height", percents = c(20, 25))
         #' # multiple indices, multiple columns
         #' kc$percentiles(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+        #' }
         #'
         #' @param index_name a vector of index names.
         #' @param columns a vector of column names.
@@ -2544,12 +2696,14 @@ Kibior <- R6Class(
         #' @family stats
         #'
         #' @examples
+        #' \dontrun{
         #' # Q1 of "sw" column "height"
         #' kc$q1("sw", "height")
         #' # if pattern
         #' kc$q1("s*", "height")
         #' # multiple indices, multiple columns
         #' kc$q1(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+        #' }
         #'
         #' @param index_name a vector of index names.
         #' @param columns a vector of column names.
@@ -2567,12 +2721,14 @@ Kibior <- R6Class(
         #' @family stats
         #'
         #' @examples
+        #' \dontrun{
         #' # Q2 of "sw" column "height"
         #' kc$q2("sw", "height")
         #' # if pattern
         #' kc$q2("s*", "height")
         #' # multiple indices, multiple columns
         #' kc$q2(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+        #' }
         #'
         #' @param index_name a vector of index names.
         #' @param columns a vector of column names.
@@ -2591,12 +2747,14 @@ Kibior <- R6Class(
         #' @family stats
         #'
         #' @examples
+        #' \dontrun{
         #' # median of "sw" column "height"
         #' kc$median("sw", "height")
         #' # if pattern
         #' kc$median("s*", "height")
         #' # multiple indices, multiple columns
         #' kc$median(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+        #' }
         #'
         #' @param index_name a vector of index names.
         #' @param columns a vector of column names.
@@ -2614,12 +2772,14 @@ Kibior <- R6Class(
         #' @family stats
         #'
         #' @examples
+        #' \dontrun{
         #' # Q3 of "sw" column "height"
         #' kc$q3("sw", "height")
         #' # if pattern
         #' kc$q3("s*", "height")
         #' # multiple indices, multiple columns
         #' kc$q3(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+        #' }
         #'
         #' @param index_name a vector of index names.
         #' @param columns a vector of column names.
@@ -2638,12 +2798,14 @@ Kibior <- R6Class(
         #' @family stats
         #'
         #' @examples
+        #' \dontrun{
         #' # summary of "sw" column "height"
         #' kc$summary("sw", "height")
         #' # if pattern
         #' kc$summary("s*", "height")
         #' # multiple indices, multiple columns
         #' kc$summary(c("sw", "sw2"), c("height", "mass"), query = "homeworld:naboo")
+        #' }
         #'
         #' @param index_name a vector of index names.
         #' @param columns a vector of column names.
@@ -2701,8 +2863,10 @@ Kibior <- R6Class(
         #' @family data-manipulation
         #'
         #' @examples
+        #' \dontrun{
         #' kc$keys("sw", "name")
         #' kc$keys("sw", "eye_color")
+        #' }
         #'
         #' @param index_name an index name.
         #' @param column a field name of this index (default: NULL).
@@ -2710,7 +2874,6 @@ Kibior <- R6Class(
         #'
         #' @return a vector of keys values from this field/column
         #'
-        # TODO test
         keys = function(index_name, column, max_size = 1000){
             if(!purrr::is_character(index_name)) stop(private$err_param_type_character("index_name"))
             if(length(index_name) > 1) stop(private$err_one_value("index_name"))
@@ -2800,16 +2963,17 @@ Kibior <- R6Class(
         #' @family data-manipulation
         #'
         #' @examples
+        #' \dontrun{
         #' dd_bai <- system.file("extdata", "test.bam.bai", package = "kibior")
         #' bam_param <- Rsamtools::ScanBamParam(what = c("pos", "qwidth"))
         #' bam_data <- Rsamtools::scanBam(dd_bai, param = bam_param)
         #' kc$bam_to_tibble(bam_data)
+        #' }
         #'
         #' @param bam_data data from a BAM file (default: NULL).
         #'
         #' @return a tibble of BAM data
         #'
-        # TODO test
         bam_to_tibble = function(bam_data = NULL){
             .unlist <- function(x){
                 # do.call(c, ...) coerces factor to integer, which is undesired
@@ -2838,7 +3002,9 @@ Kibior <- R6Class(
         #' @family data-manipulation
         #'
         #' @examples
+        #' \dontrun{
         #' kc$soft_cast(datasets::iris)
+        #' }
         #'
         #' @param data data to cast.
         #' @param caster the caster closure/function (default: tibble::as_tibble)
@@ -2847,7 +3013,6 @@ Kibior <- R6Class(
         #'
         #' @return a cast or the unchanged data.
         #'
-        # TODO test
         soft_cast = function(data, caster = getFromNamespace("as_tibble", "tibble"), caster_args = list(.name_repair = "unique"), warn = TRUE){
             if(!("closure" %in% typeof(caster))){
                 stop("Transformation function need to be a closure/function")
@@ -2873,14 +3038,16 @@ Kibior <- R6Class(
         #' @family data-manipulation
         #'
         #' @examples
+        #' \dontrun{
         #' kc$get_resource(system.file("R", "kibior.R", package = "kibior"))
         #' kc$get_resource("https://ftp.ncbi.nlm.nih.gov/entrez/README")
+        #' }
         #'
         #' @param url_or_filepath a filepath or an URL.
+        #' @param fileext the file extension (default: NULL).
         #'
         #' @return a filepath.
         #'
-        # TODO test
         get_resource = function(url_or_filepath, fileext = NULL){
             if(!purrr::is_null(fileext)){
                 if(!purrr::is_character(fileext)) stop(private$err_param_type_character("fileext"))
@@ -2922,11 +3089,13 @@ Kibior <- R6Class(
         #' @family move-data
         #'
         #' @examples
+        #' \dontrun{
         #' f <- tempfile(fileext=".csv")
         #' # export and overwrite last file with the same data from Elasticsearch
         #' kc$export(data = "sw", filepath = f)
         #' # export from in-memory data to a file
         #' kc$export(data = dplyr::starwars, filepath = f, force = TRUE)
+        #' }
         #'
         #' @param data an index name or in-memory data to be extracted to a file.
         #' @param filepath the filepath to use as export, must contain the file extention.
@@ -2964,16 +3133,19 @@ Kibior <- R6Class(
         #' @family move-data
         #'
         #' @examples
+        #' \dontrun{
         #' f <- tempfile(fileext = ".csv")
         #' rio::export(ggplot2::diamonds, f)
         #' # import to in-memory variable
         #' kc$import_tabular(filepath = f)
         #' # import raw data
         #' kc$import_tabular(filepath = f, to_tibble = FALSE)
+        #' }
         #'
         #' @param filepath the filepath to use as import, must contain the file extention.
         #' @param to_tibble returns the result as tibble? If FALSE, the raw default rio::import() 
         #'  format will be used (default: TRUE).
+        #' @param fileext the file extension (default: ".csv").
         #'
         #' @return data contained in the file as a tibble, or NULL.
         #'
@@ -2996,6 +3168,7 @@ Kibior <- R6Class(
         #' @family move-data
         #'
         #' @examples
+        #' \dontrun{
         #' # get sample files
         #' f_gff <- system.file("extdata", "chr_y.gff3.gz", package = "kibior")
         #' f_bed <- system.file("extdata", "cpg.bed", package = "kibior")
@@ -3005,10 +3178,12 @@ Kibior <- R6Class(
         #' # import raw data
         #' kc$import_features(filepath = f_bed, to_tibble = FALSE)
         #' kc$import_features(filepath = f_gff, to_tibble = FALSE)
+        #' }
         #'
         #' @param filepath the filepath to use as import, must contain the file extention.
         #' @param to_tibble returns the result as tibble? If FALSE, the raw default 
         #'  rtracklayer::import() format will be used (default: TRUE).
+        #' @param fileext the file extension (default: ".gtf").
         #'
         #' @return data contained in the file as a tibble, or NULL.
         #'
@@ -3029,16 +3204,19 @@ Kibior <- R6Class(
         #' @family move-data
         #'
         #' @examples
+        #' \dontrun{
         #' # get sample file
         #' f_bai <- system.file("extdata", "test.bam.bai", package = "kibior")
         #' # import to in-memory variable
         #' kc$import_alignments(filepath = f_bai)
         #' # import raw data
         #' kc$import_alignments(filepath = f_bai, to_tibble = FALSE)
+        #' }
         #'
         #' @param filepath the filepath to use as import, should contain the file extention.
         #' @param to_tibble returns the result as tibble? If FALSE, the raw default 
         #'  Rsamtools::scanBam() format will be used (default: TRUE).
+        #' @param fileext the file extension (default: ".bam").
         #'
         #' @return data contained in the file as a tibble, or NULL.
         #'
@@ -3060,16 +3238,19 @@ Kibior <- R6Class(
         #' @family move-data
         #'
         #' @examples
+        #' \dontrun{
         #' # get sample file
         #' f_json <- system.file("extdata", "storms100.json", package = "kibior")
         #' # import to in-memory variable
         #' kc$import_json(f_json)
         #' # import raw data
         #' kc$import_json(f_json, to_tibble = FALSE)
+        #' }
         #'
         #' @param filepath the filepath to use as import, should contain the file extention.
         #' @param to_tibble returns the result as tibble? If FALSE, the raw dataframe format 
         #'  will be used (default: TRUE).
+        #' @param fileext the file extension (default: ".json").
         #'
         #' @return data contained in the file as a tibble, dataframe or NULL.
         #'
@@ -3091,6 +3272,7 @@ Kibior <- R6Class(
         #' @family move-data
         #'
         #' @examples
+        #' \dontrun{
         #' # get sample file
         #' f_dna <- system.file("extdata", "dna_human_y.fa.gz", package = "kibior")
         #' f_rna <- system.file("extdata", "ncrna_mus_musculus.fa.gz", package = "kibior")
@@ -3101,11 +3283,13 @@ Kibior <- R6Class(
         #' kc$import_sequences(filepath = f_rna, to_tibble = FALSE, fasta_type = "rna")
         #' # import auto
         #' kc$import_sequences(filepath = f_aa)
+        #' }
         #'
         #' @param filepath the filepath to use as import, should contain the file extention.
         #' @param to_tibble returns the result as tibble? If FALSE, the raw default 
         #'  Rsamtools::scanBam() format will be used (default: TRUE).
-        #' @param fasta_type type of parsing. It can be "dna", "rna", "aa" ou "auto" (default: "auto")
+        #' @param fasta_type type of parsing. It can be "dna", "rna", "aa" ou "auto" (default: 
+        #'  "auto")
         #'
         #' @return data contained in the file as a tibble, or NULL.
         #'
@@ -3152,6 +3336,7 @@ Kibior <- R6Class(
         #' @family move-data
         #'
         #' @examples
+        #' \dontrun{
         #' # get sample file
         #' f_dna <- system.file("extdata", "dna_human_y.fa.gz", package = "kibior")
         #' f_rna <- system.file("extdata", "ncrna_mus_musculus.fa.gz", package = "kibior")
@@ -3166,6 +3351,7 @@ Kibior <- R6Class(
         #' kc$guess_import(f_bai)
         #' kc$guess_import(f_gff)
         #' kc$guess_import(f_bed)
+        #' }
         #'
         #' @param filepath the filepath to use as import, must contain the file extention.
         #' @param to_tibble returns the result as tibble? (default: TRUE).
@@ -3246,6 +3432,7 @@ Kibior <- R6Class(
         #' @family move-data
         #'
         #' @examples
+        #' \dontrun{
         #' # get sample file
         #' f_aa <- system.file("extdata", "pep_mus_spretus.fa.gz", package = "kibior")
         #' f_gff <- system.file("extdata", "chr_y.gff3.gz", package = "kibior")
@@ -3257,9 +3444,11 @@ Kibior <- R6Class(
         #' # import to index by recreating it, then pull indexed data
         #' kc$import(filepath = f_gff, push_index = "sw_from_file",
         #'  push_mode = "recreate")
+        #' }
         #'
         #' @param filepath the filepath to use as import, must contain the file extention.
-        #' @param import_type can be one of "auto", "tabular", "features", "alignments", "sequences" (default: "auto").
+        #' @param import_type can be one of "auto", "tabular", "features", "alignments", "sequences" 
+        #'  (default: "auto").
         #' @param push_index the name of the index where to push data (default: NULL).
         #' @param push_mode the push mode (default: "check").
         #' @param id_col the column name of unique IDs (default: NULL).
@@ -3312,6 +3501,7 @@ Kibior <- R6Class(
         #' @family move-data
         #'
         #' @examples
+        #' \dontrun{
         #' # erase the last push data by recreating the index and re-pushing data
         #' kc$push(dplyr::starwars, index_name = "sw", mode = "recreate")
         #' # characters names are unique, can be used as ID
@@ -3325,6 +3515,7 @@ Kibior <- R6Class(
         #' kc$push(some_new_data, "sw", mode = "update", id_col = "name")
         #' # view result by querying
         #' kc$pull("sw", query = "height:>180", columns = c("name", "gender"))
+        #' }
         #'
         #' @param data the data to push.
         #' @param index_name the index name to use in Elasticsearch.
@@ -3348,7 +3539,7 @@ Kibior <- R6Class(
             # check index absence/presence
             has_index <- self$match(index_name)
             if(mode == "check"){
-                if(index_name %in% has_index) stop(private$err_index_already_exists(already_there_index))
+                if(index_name %in% has_index) stop(private$err_index_already_exists(index_name))
             }
             if(mode == "update"){
                 if(purrr::is_null(id_col)) stop("Update mode needs a unique IDs column name.")
@@ -3582,9 +3773,10 @@ Kibior <- R6Class(
         #' Everything is done by bulk.
         #' This method is essentially a wrapper around `$search()` with parameter `head = FALSE`
         #'
-        #' @family move-data, search
+        #' @family move-data
         #'
         #' @examples
+        #' \dontrun{
         #' # push some data sample
         #' kc$push(dplyr::storms, "storms")
         #' # get the whole "sw" index
@@ -3603,6 +3795,7 @@ Kibior <- R6Class(
         #' # it can be used in conjunction with `columns` to select only columns that matter
         #' r <- kc$pull("sw", query = "height:>180 && homeworld:(Tatooine || Naboo)", columns = 
         #'  c("name", "hair_color", "homeworld"))
+        #' }
         #'
         #' @param index_name the index name to use in Elasticsearch.
         #' @param bulk_size the number of record to send to Elasticsearch in a row (default: 500).
@@ -3646,11 +3839,13 @@ Kibior <- R6Class(
         #' @family move-data
         #'
         #' @examples
+        #' \dontrun{
         #' kc$push(dplyr::starwars, "sw", mode = "recreate")
         #' # move data from an index to another (change name, same instance)
         #' r <- kc$move(from_index = "sw", to_index = "sw_new")
         #' kc$pull("sw_new")
-        #' kc$list() 
+        #' kc$list()
+        #' } 
         #'
         #' @param from_instance If not NULL, the Kibior object of another instance. if NULL 
         #'  (default), this instance will be used. (default: NULL).
@@ -3713,7 +3908,8 @@ Kibior <- R6Class(
                 body = list(
                     source = source_param,
                     dest = list(index = to_index)
-                )
+                ),
+                wait_for_completion = FALSE
             )
             # function to manage ES errors
             handle_error <- function(e){
@@ -3744,7 +3940,6 @@ Kibior <- R6Class(
             if(self$quiet_results) invisible(to_index) else to_index
         },
 
-        # TODO test
         #'
         #' @details
         #' Copy data from one index to another.
@@ -3754,10 +3949,12 @@ Kibior <- R6Class(
         #' @family move-data
         #'
         #' @examples
+        #' \dontrun{
         #' # copy data from one index to another (same instance)
         #' r <- kc$copy(from_index = "sw_new", to_index = "sw")
         #' kc$pull(c("sw", "sw_new"))
-        #' kc$list() 
+        #' kc$list()
+        #' } 
         #'
         #' @param from_instance If not NULL, the Kibior object of another instance. if NULL 
         #'  (default), this instance will be used. (default: NULL).
@@ -3789,9 +3986,10 @@ Kibior <- R6Class(
         #' @details
         #' Match requested index names against Elasticsearch indices list.
         #'
-        #' @family search
+        #' @family search-data
         #'
         #' @examples
+        #' \dontrun{
         #' # search "sw" index name
         #' kc$match("sw")
         #' # search all starting with an "s"
@@ -3802,6 +4000,7 @@ Kibior <- R6Class(
         #' kc$match(c("sw", "sw_new", "nope"))
         #' # search multiple names with pattern
         #' kc$match(c("s*", "nope"))
+        #' }
         #'
         #' @param index_name the index name to use in Elasticsearch, can be a pattern with '*'.
         #'
@@ -3839,9 +4038,10 @@ Kibior <- R6Class(
         #' If you want to get all data, use `head = FALSE` or `$pull()`.
         #' Everything is done by bulk.
         #'
-        #' @family search
+        #' @family search-data
         #'
         #' @examples
+        #' \dontrun{
         #' # search "sw" index, head mode on
         #' kc$search("sw")
         #' # search "sw" index with all metadata, head mode on
@@ -3858,6 +4058,7 @@ Kibior <- R6Class(
         #' # it can be used in conjunction with `columns` to select only columns that matter
         #' kc$search("*", query = "height:>180 && homeworld:(Tatooine || Naboo)", columns = 
         #'  c("name", "hair_color", "homeworld"))
+        #' }
         #'
         #' @param index_name the index name to use in Elasticsearch (default: NULL).
         #' @param bulk_size the number of record to send to Elasticsearch in a row (default: 500).
@@ -4248,6 +4449,7 @@ Kibior <- R6Class(
         #' @family joins
         #'
         #' @examples
+        #' \dontrun{
         #' # some data for joins examples
         #' kc$push(ggplot2::diamonds, "diamonds")
         #' # prepare join datasets, only big the biggest diamonds are selected (9)
@@ -4258,6 +4460,7 @@ Kibior <- R6Class(
         #' # execute a inner_join with one index queried, and one in-memory dataset
         #' kc$inner_join(ggplot2::diamonds, "diamonds", right_query 
         #'  = "carat:>3.5")
+        #' }
         #'
         #' @return a tibble
         #'
@@ -4277,6 +4480,7 @@ Kibior <- R6Class(
         #' @family joins
         #'
         #' @examples
+        #' \dontrun{
         #' # prepare join datasets, fair cuts 
         #' fair_cut <- dplyr::filter(ggplot2::diamonds, cut == "Fair")  # 1605 lines
         #' sup_carat <- kc$pull("diamonds_superior")$diamonds_superior
@@ -4284,6 +4488,7 @@ Kibior <- R6Class(
         #' kc$full_join(fair_cut, "diamonds_superior")
         #' # execute a full_join with one index queried, and one in-memory dataset
         #' kc$full_join(sup_carat, "diamonds", right_query = "cut:fair")
+        #' }
         #'
         #' @return a tibble
         #'
@@ -4303,6 +4508,7 @@ Kibior <- R6Class(
         #' @family joins
         #'
         #' @examples
+        #' \dontrun{
         #' # prepare join datasets, fair cuts 
         #' fair_cut <- dplyr::filter(ggplot2::diamonds, cut == "Fair")  # 1605 lines
         #' sup_carat <- kc$pull("diamonds_superior")$diamonds_superior
@@ -4311,6 +4517,7 @@ Kibior <- R6Class(
         #' # execute a left_join with one index queried, and one in-memory dataset
         #' kc$left_join(sup_carat, "diamonds", right_query 
         #'  = "cut:fair")
+        #' }
         #'
         #' @return a tibble
         #'
@@ -4330,6 +4537,7 @@ Kibior <- R6Class(
         #' @family joins
         #'
         #' @examples
+        #' \dontrun{
         #' # prepare join datasets, fair cuts 
         #' fair_cut <- dplyr::filter(ggplot2::diamonds, cut == "Fair")  # 1605 lines
         #' sup_carat <- kc$pull("diamonds_superior")$diamonds_superior
@@ -4338,6 +4546,7 @@ Kibior <- R6Class(
         #' # execute a right_join with one index queried, and one in-memory dataset
         #' kc$right_join(sup_carat, "diamonds", right_query 
         #'  = "cut:fair")
+        #' }
         #'
         #' @return a tibble
         #'
@@ -4357,6 +4566,7 @@ Kibior <- R6Class(
         #' @family joins
         #'
         #' @examples
+        #' \dontrun{
         #' # prepare join datasets, fair cuts 
         #' fair_cut <- dplyr::filter(ggplot2::diamonds, cut == "Fair")  # 1605 lines
         #' sup_carat <- kc$pull("diamonds_superior")$diamonds_superior
@@ -4365,6 +4575,7 @@ Kibior <- R6Class(
         #' # execute a semi_join with one index queried, and one in-memory dataset
         #' kc$semi_join(sup_carat, "diamonds", right_query 
         #'  = "cut:fair")
+        #' }
         #'
         #' @return a tibble
         #'
@@ -4384,6 +4595,7 @@ Kibior <- R6Class(
         #' @family joins
         #'
         #' @examples
+        #' \dontrun{
         #' # prepare join datasets, fair cuts 
         #' fair_cut <- dplyr::filter(ggplot2::diamonds, cut == "Fair")  # 1605 lines
         #' sup_carat <- kc$pull("diamonds_superior")$diamonds_superior
@@ -4396,6 +4608,7 @@ Kibior <- R6Class(
         #' # Do not mind this, removing example indices
         #' elastic::index_delete(kc$connection, "*")
         #' kc <- NULL
+        #' }
         #'
         #' @return a tibble
         #'

@@ -4,7 +4,7 @@
 \alias{Static - Kibior is instance}
 \title{Static - Kibior is instance}
 \arguments{
-\item{other}{an object}
+\item{obj}{an object}
 }
 \value{
 TRUE if the given object is an instance of Kibior, else FALSE
