@@ -154,6 +154,7 @@ Kibior <- R6Class(
             # "bb" = stop("Not supported. See https://support.bioconductor.org/p/116736/"),
             # alignment
             "bam"   = "alignments",
+            "bai"   = "alignments",
             # sequence
             "fasta" = "sequences",
             "fa"    = "sequences",
