@@ -25,15 +25,14 @@ bioc_check: true
 r: 
   - release
   - devel
-  - bioc-release
-  - bioc-devel
+  # - bioc-release
+  # - bioc-devel
 
 env:
   - ES_VERSION=6.8.9 R_COV=true
   - ES_VERSION=7.5.2 R_COV=true
-  - ES_VERSION=7.6.2 R_COV=true
-  - ES_VERSION=7.7.1 R_COV=true
-  - ES_VERSION=7.8.0 R_COV=true
+  - ES_VERSION=7.8.1 R_COV=true
+  - ES_VERSION=7.9.1 R_COV=true
 
 # PROCESS
 
@@ -75,7 +74,7 @@ after_success:
 
 ## NOTIF
 
-# notifications:
-  # email:
-    # on_success: never
-    # on_failure: never
+notifications:
+  email:
+    on_success: never
+    on_failure: never
