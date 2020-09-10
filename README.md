@@ -5,6 +5,7 @@
 # kibior: easy scientific data handling, searching and sharing with Elasticsearch
 
 [![Project Status: Active](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active)
+[![Build Status](https://travis-ci.com/regisoc/kibior.svg?branch=master)](https://travis-ci.com/regisoc/kibior)
 
 ## What
 
