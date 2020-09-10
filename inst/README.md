@@ -53,13 +53,15 @@ See the fixed vignette, section **Deploying an Elasticsearch instance** to set o
 
 ### Full test suite
 
-> Be warned that there are lots of tests.
-> They can take more than an hour to run on older CPUs.
+> Be warned that there are lots of tests (> 1500), a 1/3 are pushing/pulling data which takes time.
+> My laptop is running all tests on a Dell inspiron core i5-8250U CPU @ 1.60GHz, 4c/8t
+> It takes about 45min to run all tests, but can easily take more than an hour to run on older CPUs.
 > You can regulate the number of tests by modifying the calls inside the "tests/testthat.R" file.
 
-- Inside the project folder, take the "inst/doc_env/test_suite" folder content and copy it in "tests/testthat" folder.
-- Go to the parent folder and run the build on Kibior folder: `R CMD build kibior`.
-- Then, check the generated archive: `R CMD check kibior_<VERSION>.tar.gz`.
+- Inside the project folder, take the "inst/doc_env/test_suite" folder content and copy it in "tests" folder.
+- 2 options from now:
+  - In a terminal: go to the parent folder and run the build/check on Kibior folder: `R CMD build kibior`, then `R CMD check kibior_<VERSION>.tar.gz`.
+  - In an R session: use `devtools` to run tests: `devtools::test()`.
 
 
 

@@ -2048,7 +2048,7 @@ kc$columns("iris")
 
 - `$move()` and `$copy()` for remote instances are very sensitive to authentication and security configurations. Some tasks will not be possible due to each organism security measures. Check with your favorite or proper system administrator.
 
-- *Joins are not executed server-side*, which actually means the Elasticsearch data must be downloaded before executing the actual join. Querying and selecting columns with joins parameters `left_columns`, `right_columns`, `left_query` and `right_query` is realtively important to lower data transfer payload and fasten the execution.
+- *Joins are not executed server-side (on ES)*, which actually means the Elasticsearch data must be downloaded before executing the actual join. Querying and selecting columns with joins parameters `left_columns`, `right_columns`, `left_query` and `right_query` is realtively important to lower data transfer payload and fasten the execution.
 
 - Elasticsearch limits returned results to *10.000 elements per bulk*. If you try to set `bulk_size` > 10000 in parameter, `kibior` will downsize it to match the maximum allowed.
 

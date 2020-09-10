@@ -2,56 +2,56 @@
 
 context("Cluster wealth")
 
-# testthat::setup({
-#     # remove indices if they exist
-#     remove_all_indices()
-# })
+testthat::setup({
+    # remove indices if they exist
+    remove_all_indices()
+})
 
-# testthat::teardown({
-#     # remove indices if they exist
-#     remove_all_indices()
-# })
+testthat::teardown({
+    # remove indices if they exist
+    remove_all_indices()
+})
 
 
-# start stats ----
+# start infos ----
 
-test_that("kibior::stats, nominal use, no arg", {
-    s <- kc$stats()
+test_that("kibior::infos, nominal use, no arg", {
+    s <- kc$infos()
     expect_equal(s$status, kc$cluster_status)
     expect_equal(s$cluster_name, kc$cluster_name)
   
 })
 
-test_that("kibior::stats, version check", {
+test_that("kibior::infos, version check", {
     remove_all_indices()
-    expect_true(paste0(kc$version, collapse = ".") %in% kc$stats()$nodes$versions)
+    expect_true(paste0(kc$version, collapse = ".") %in% kc$infos()$nodes$versions)
 })
 
-test_that("kibior::stats, nominal use, constant", {
+test_that("kibior::infos, nominal use, constant", {
     remove_all_indices()
-    expect_equal(kc$stats()$indices$count, 0)
+    expect_equal(kc$infos()$indices$count, 0)
     res <- kc$create(single_index_name)
     res %>% unlist(use.names = FALSE) %>% expect_true()
-    expect_equal(kc$stats()$indices$count, length(single_index_name))
+    expect_equal(kc$infos()$indices$count, length(single_index_name))
     remove_all_indices()
-    expect_equal(kc$stats()$indices$count, 0)
+    expect_equal(kc$infos()$indices$count, 0)
     res <- kc$create(multiple_indice_names)
     res %>% unlist(use.names = FALSE) %>% all() %>% expect_true()
-    expect_equal(kc$stats()$indices$count, length(multiple_indice_names))
+    expect_equal(kc$infos()$indices$count, length(multiple_indice_names))
 })
 
-test_that("kibior::stats, list vs", {
+test_that("kibior::infos, list vs", {
     remove_all_indices()
     expect_null(kc$list())
-    expect_true(kc$stats()$indices$count == 0)
+    expect_true(kc$infos()$indices$count == 0)
 
     res <- kc$create(single_index_name)
     res %>% unlist(use.names = FALSE) %>% expect_true()
-    expect_equal(length(kc$list()), kc$stats()$indices$count)
+    expect_equal(length(kc$list()), kc$infos()$indices$count)
 
 })
 
-# end stats
+# end infos
 
 
 

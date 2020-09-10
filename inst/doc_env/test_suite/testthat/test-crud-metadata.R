@@ -2,55 +2,17 @@
 
 context("CRUD metadata")
 
+testthat::setup({
+    # remove indices if they exist
+    remove_all_indices()
+})
 
+testthat::teardown({
+    # remove indices if they exist
+    remove_all_indices()
+})
 
 ### ------------------------------------------ READ
-
-
-# start metadata ----
-
-test_that("kibior::metadata, null arg, no index", {
-    remove_all_indices()
-    expect_null(kc$metadata())
-    expect_null(kc$metadata(c()))
-})
-
-test_that("kibior::metadata, null empty index", {
-    remove_all_indices()
-    res <- kc$create(single_index_name)
-    res %>% unlist(use.names = FALSE) %>% expect_true()
-    m <- kc$metadata(names(res))[[single_index_name]]
-    expect_length(m, 3)
-    expect_setequal((names(m)), all_features)
-})
-
-test_that("kibior::metadata, wrong types args", {
-    kc$create(single_index_name, force = TRUE)
-    expect_error(kc$metadata(index_name = list()))
-    expect_error(kc$metadata(index_name = NA))
-    expect_error(kc$metadata(index_name = c("aaa", "bbb")))
-    expect_error(kc$metadata(index_name = list("aaa", "bbb")))
-    expect_error(kc$metadata(index_name = list(aa="aaa", bb="bbb")))
-})
-
-test_that("kibior::metadata, nominal case, one index, all features present", {
-    res <- kc$create(index_name = single_index_name, force = TRUE)
-    m <- kc$metadata(names(res))[[single_index_name]]
-    expect_length(names(m), 3)
-    expect_setequal(names(m), all_features)
-})
-
-test_that("kibior::metadata, nominal case, multiple indices, all features present", {
-    res <- kc$create(multiple_indice_names, force = TRUE)
-    m <- kc$metadata(names(res))
-    for(i in names(m)){
-        expect_length(names(m[[i]]), 3)
-        expect_setequal(names(m[[i]]), all_features)
-    }
-})
-
-
-# end metadata
 
 
 
@@ -153,7 +115,8 @@ test_that("kibior::mappings, nominal case, multiple indices, indices with data",
 
 test_that("kibior::settings, null arg, no index", {
     remove_all_indices()
-    expect_null(kc$settings())
+    expect_error(kc$settings())
+    expect_null(kc$settings("*"))
 })
 
 test_that("kibior::settings, arg, no index", {
@@ -185,7 +148,7 @@ test_that("kibior::settings, nominal case, single index, no arg, index empty", {
     remove_all_indices()
     res <- kc$create(single_index_name)
     res %>% unlist(use.names = FALSE) %>% expect_true()
-    s <- kc$settings()
+    s <- kc$settings(single_index_name)
     expect_equal(names(s), single_index_name)
     expect_equal(s[[single_index_name]]$index$provided_name, single_index_name)
 })
@@ -195,7 +158,7 @@ test_that("kibior::settings, nominal case, multiple indices, no arg", {
     res <- kc$create(multiple_indice_names)
     res %>% unlist(use.names = FALSE) %>% all() %>% expect_true()
     #
-    s <- kc$settings()
+    s <- kc$settings(multiple_indice_names)
     expect_setequal(names(s), multiple_indice_names)
     for(i in names(s)){
         expect_equal(s[[i]]$index$provided_name, i)
@@ -206,9 +169,9 @@ test_that("kibior::settings, nominal case, single index, index with data", {
     remove_all_indices()
     res <- kc$push(dplyr::starwars, single_index_name)
     expect_equal(res, single_index_name)
-    s <- kc$settings()
+    s <- kc$settings("*")
     expect_equal(names(s), single_index_name)
-    # settings(name) == settings()
+    # settings(name) == settings("*")
     m2 <- kc$settings(single_index_name)
     d <- setdiff(s, m2) # empty list
     expect_length(d, 0)  
@@ -221,10 +184,10 @@ test_that("kibior::settings, nominal case, multiple indices, indices with data",
         res <- kc$push(dplyr::starwars, i)
         expect_equal(res, i)
     }
-    s <- kc$settings()
+    s <- kc$settings("*")
     expect_setequal(names(s), multiple_indice_names)
     for(i in multiple_indice_names){
-        # settings(name) == settings()
+        # settings(name) == settings("*")
         m2 <- kc$settings(i)
         d <- setdiff(s, m2) # empty list
         expect_length(d, length(s) - 1)  
