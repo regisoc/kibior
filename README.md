@@ -4,12 +4,11 @@
 
 # kibior: easy scientific data handling, searching and sharing with Elasticsearch
 
-[![Project Status: WIP – Initial development is in progress, but there has not yet been a stable, usable release suitable for the public.](https://www.repostatus.org/badges/latest/wip.svg)](https://www.repostatus.org/#wip)
+[![Project Status: Active](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active)
 
 ## What
 
-**kibior** is a R package dedicated to ease the pain of data manipulation. 
-Its main features allow **pushing, pulling, sharing and searching** tabular data.
+**kibior** is a R package dedicated to ease the pain of data handling, searching and sharing.  Its main features allow **pushing, pulling, sharing and searching** tabular data.
 
 
 ## Where
@@ -19,7 +18,7 @@ Its main features allow **pushing, pulling, sharing and searching** tabular data
 
 ## Who
 
-**kibior** mainly targets data scientists
+**kibior** mainly targets bioinformaticians, data scientists and anyone having a dataset to search and/or share.
 
 
 ## How
@@ -27,17 +26,28 @@ Its main features allow **pushing, pulling, sharing and searching** tabular data
 ```r
 library(kibior)
 
-# Get an instance
-kc <- Kibior$new("server_or_address")
+# Get a specific instance
+kc <- Kibior$new("server_or_address", port)
 
 # Push
 dplyr::starwars %>% kc$push("sw")
 
 # Search
-kc$search("sw", query = "my_query")
+kc$search("sw", query = "homeworld:naboo")
 
 # Pull
-kc$pull("sw")
+kc$pull("sw", query = "homeworld:tatooine", 
+              columns = c("name", "homeworld", "height", "mass", "species"))
+
+# Or try something bigger...
+kibio <- Kibior$get_kibio_instance()
+kibio$list()
 ```
 
-## 
+## Learn 
+
+See the "Introduction" vignette for basic and advanced usage.
+
+## Cite 
+
+TODO
