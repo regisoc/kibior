@@ -3910,19 +3910,21 @@ Kibior <- R6Class(
                     source = source_param,
                     dest = list(index = to_index)
                 ),
-                wait_for_completion = FALSE
+                wait_for_completion = "false"
             )
             # function to manage ES errors
             handle_error <- function(e){
                 message(" -> Moving: errors during data transfer")
-                invisible(self$delete(to_index))
+                self$delete(to_index)
                 stop(e)
             }
             # reindex
             self$create(to_index, force = force)
-            res <- tryCatch({
+            res <- tryCatch(
+                expr = {
                     do.call(elastic::reindex, reindex_args)
-                }, error = function(e){
+                }, 
+                error = function(e){
                     handle_error(e)
                 }
             )
