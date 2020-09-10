@@ -42,5 +42,5 @@ Suggests:
     testthat (>= 2.3.2),
     rmarkdown (>= 2.3),
     knitr (>= 1.28)
-License: Apache License (>= 2.0)
+License: GPL-2 + file
 LazyData: true
