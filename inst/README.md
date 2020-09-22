@@ -4,7 +4,7 @@
 # Vignettes and tests
 
 Tests and vignettes need an empty ElasticSearch (ES) instance to really test the core KibioR methods (e.g. push, pull, search). They can be conducted throught an ES instance run via Docker to easily select multiple versions.
-Unfortunately, interactive build has been removed since BioC and CRAN cannot deploy a single ES instance during build/check phases (not accessible during build/check).
+Unfortunately, interactive build has been removed since each build should test them on the spot (with the current machine they are tested on).
 
 When linked to ES, you can run the **full test suite** and compile the **interactive vignettes**.
 Follow the rest of the file to make it happen.
@@ -54,7 +54,7 @@ See the fixed vignette, section **Deploying an Elasticsearch instance** to set o
 ### Full test suite
 
 > Be warned that there are lots of tests (> 1500), a 1/3 are pushing/pulling data which takes time.
-> My laptop is running all tests on a Dell inspiron core i5-8250U CPU @ 1.60GHz, 4c/8t
+> My laptop is running all tests on a Dell inspiron core i5-8250U CPU @ 1.60GHz, 4c/8t.
 > It takes about 45min to run all tests, but can easily take more than an hour to run on older CPUs.
 > You can regulate the number of tests by modifying the calls inside the "tests/testthat.R" file.
 
