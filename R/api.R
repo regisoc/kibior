@@ -3044,11 +3044,11 @@ Kibior <- R6Class(
             } 
             if(file.exists(url_or_filepath)){
                 # file exists
-                url_or_filepath
+                res <- url_or_filepath
             } else {
                 # not local
                 if(self$verbose) message("Filepath does not exist locally, trying download...")
-                tryCatch(
+                res <- tryCatch(
                     expr = {
                         f <- tempfile(fileext = fileext)
                         download.file(url_or_filepath, f)
@@ -3062,6 +3062,7 @@ Kibior <- R6Class(
                     }
                 )
             }
+            res
         },
 
 
