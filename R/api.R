@@ -4629,9 +4629,20 @@ Kibior <- R6Class(
 #' @return a new instance of Kibior conencted to `kibio.compbio.ulaval.ca`
 #'
 Kibior$get_kibio_instance <- function(verbose = FALSE){
-    .tkci <- Kibior$new("kibio.compbio.ulaval.ca", 80, verbose = verbose)
-    message("This instance grants you anonymous connection with read-only priviledges")
-    .tkci
+    kibio_endpoint <- "kibio.compbio.ulaval.ca"
+    kibio_port <- 80L
+    message("Trying to connect to Kibio servers on '", kibio_endpoint, ":", kibio_port, "'")
+    tryCatch(expr = {
+            Kibior$new(kibio_endpoint, kibio_port, verbose = verbose)
+            message("This instance grants you anonymous connection with read-only priviledges")
+        }, 
+        error = function(e){
+            e$message %>% 
+                paste0("\nKibio servers seems not accessible.") %>% 
+                paste0("\nPlease, try updating the KibioR package.") %>%
+                stop()
+        }
+    )
 }
 
 #' 
