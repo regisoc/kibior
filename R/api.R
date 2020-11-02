@@ -4615,10 +4615,10 @@ Kibior <- R6Class(
 # Kibior static methods
 #
 
-#' 
+#'
 #' @title Static - initiate a direct instance to Kibio public repository
 #' @name Static - initiate a direct instance to Kibio public repository
-#' 
+#'
 #' @details
 #' Initiate a instance of Kibior connected to the Kibio public repository.
 #'
@@ -4626,15 +4626,16 @@ Kibior <- R6Class(
 #'
 #' @family initiate
 #'
-#' @return a new instance of Kibior conencted to `kibio.compbio.ulaval.ca`
+#' @return a new instance of Kibior conencted to Kibio service
 #'
 Kibior$get_kibio_instance <- function(verbose = FALSE){
     kibio_endpoint <- "kibio.compbio.ulaval.ca"
     kibio_port <- 80L
     message("Trying to connect to Kibio servers on '", kibio_endpoint, ":", kibio_port, "'")
     tryCatch(expr = {
-            Kibior$new(kibio_endpoint, kibio_port, verbose = verbose)
+            k <- Kibior$new(kibio_endpoint, kibio_port, verbose = verbose)
             message("This instance grants you anonymous connection with read-only priviledges")
+            k
         }, 
         error = function(e){
             e$message %>% 
