@@ -3,13 +3,6 @@ title: "KibioR - Introduction"
 author: Régis Ongaro-Carcy
 date: "`r Sys.Date()`"
 output:
-  rmarkdown::html_notebook:
-    highlight: tango
-    number_sections: true
-    theme: cosmo
-    toc: true
-    toc_depth: 3
-    toc_float: true
   rmarkdown::html_document:
     highlight: tango
     number_sections: true
@@ -1516,8 +1509,8 @@ kc$columns("iris")
 
 | Software        | Version                           |
 |-----------------|---------------------------------- |
-| `Elasticsearch` | `6.8`, `7.5`, `7.8`               |
-| `R`             | `3.6.1`, `4.0.2`                  |
+| `Elasticsearch` | `6.8`, `7.5`, `7.8`, `7.9`        |
+| `R`             | `3.6.1`, `4.0.2`, `4.0.3`         |
 | `RStudio`       | `1.2.5001, build 93, 7b3fe265`    |
 
 

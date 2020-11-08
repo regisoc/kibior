@@ -131,7 +131,7 @@ test_that("kibior::search, query size error", {
             paste0(collapse = "")
     }
     # 
-    for(i in c(10, 100, 1000, 4000)){
+    for(i in c(10, 100, 1000, 3000)){
         p <- produce_str(i)
         # full query under 4096 bytes, so this return something (empty)
         res <- kc$search(index, query = p)[[index]]

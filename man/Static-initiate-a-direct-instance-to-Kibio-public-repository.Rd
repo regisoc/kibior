@@ -7,7 +7,7 @@
 \item{verbose}{verbosity activation (default: FALSE)}
 }
 \value{
-a new instance of Kibior conencted to `kibio.compbio.ulaval.ca`
+a new instance of Kibior conencted to Kibio service
 }
 \description{
 Static - initiate a direct instance to Kibio public repository
