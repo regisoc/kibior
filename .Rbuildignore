@@ -40,3 +40,5 @@ demo/pandas
 ^doc$
 ^Meta$
 ^NEWS\.md$
+^inst/doc_env/kibior_build\.R$
+^inst/doc_env/test_suite/testthat/helper\.R$

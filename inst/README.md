@@ -4,7 +4,7 @@
 # Vignettes and tests
 
 Tests and vignettes need an empty ElasticSearch (ES) instance to really test the core KibioR methods (e.g. push, pull, search). They can be conducted throught an ES instance run via Docker to easily select multiple versions.
-Unfortunately, interactive build has been removed since each build should test them on the spot (with the current machine they are tested on).
+Unfortunately, interactive build has been removed since each build should test them on the spot (with the current machine they are tested on). 
 
 When linked to ES, you can run the **full test suite** and compile the **interactive vignettes**.
 Follow the rest of the file to make it happen.
@@ -19,9 +19,11 @@ After downloading the project sources, you can find all that is needed inside th
 
 ## Requirements
 
-An empty and accessible ES running instance.
+1. An empty and accessible ES running instance.
 You can download the project from ES website or run a single instance via Docker.
 See the fixed vignette, section **Deploying an Elasticsearch instance** to set one with Docker.
+
+2. The Github version of the project. The packaged version has not some scripts that automatically load environment variables and prepare for tests. The scripts required are: `inst/doc_env/kibior_build.R` and `inst/doc_env/tests_suite/helper.R`.
 
 ## Process
 

@@ -949,6 +949,11 @@ Kibior <- R6Class(
             "Field is unknown or not present"
             paste0("Field `", field_name, "` is not present in index `", index_name, "`.") 
         },
+
+        err_pkg_required = function(method_name, pkg_name, repo_name){
+            paste0("Method `", method_name, "` requires `", pkg_name, "` (", repo_name,") package.") %>%
+                paste0("\nPlease, install this package and retry.")
+        },
        
         # Sad error is sad.
         ERR_WTF = "Well. This is sad. Report with an issue please."
@@ -3072,6 +3077,7 @@ Kibior <- R6Class(
 
         #' @details
         #' Export data to a file.
+        #' Needs 'rio' package from CRAN.
         #' Some data formats are not installed by default.
         #' Use `rio::install_formats()` to be able to parse them.
         #'
@@ -3106,6 +3112,11 @@ Kibior <- R6Class(
                     stop(private$err_index_unknown(absent_indices))
                 }
             }
+            # check package
+            if(!Kibior$.is_installed("rio")[[1]]){
+                stop(err_pkg_required("export", "rio", "CRAN"))
+            }
+            #
             if(!force && file.exists(filepath)) stop("File already exists. Use `force = TRUE` to overwrite")
             # 
             # data can be a in-memory dataset, or a name of an index in ES
@@ -3117,6 +3128,7 @@ Kibior <- R6Class(
 
         #' @details
         #' Import method for tabular data.
+        #' Needs 'rio' package from CRAN.
         #' Works mainly with CSV, TSV, TAB, TXT and ZIPped formats.
         #'
         #' @family move-data
@@ -3139,8 +3151,10 @@ Kibior <- R6Class(
         #' @return data contained in the file as a tibble, or NULL.
         #'
         import_tabular = function(filepath, to_tibble = TRUE, fileext = ".csv"){
-            # check pkg
-            Kibior$.install_packages("rio")
+            # check package
+            if(!Kibior$.is_installed("rio")[[1]]){
+                stop(err_pkg_required("import_tabular", "rio", "CRAN"))
+            }
             # do import
             filepath %>% 
                 self$get_resource(fileext = fileext) %>%
@@ -3152,6 +3166,7 @@ Kibior <- R6Class(
 
         #' @details
         #' Import method for features data.
+        #' Needs 'rtracklayer' package from Bioconductor.
         #' Works with BED, GTF, GFFx, and GZIPped formats.
         #'
         #' @family move-data
@@ -3177,7 +3192,11 @@ Kibior <- R6Class(
         #' @return data contained in the file as a tibble, or NULL.
         #'
         import_features = function(filepath, to_tibble = TRUE, fileext = ".gtf"){
-            Kibior$.install_packages("rtracklayer")
+            # check package
+            if(!Kibior$.is_installed("rtracklayer")[[1]]){
+                stop(err_pkg_required("import_features", "rtracklayer", "Bioconductor"))
+            }
+            #
             filepath %>% 
                 self$get_resource(fileext = fileext) %>%
                 rtracklayer::import() %>%
@@ -3188,6 +3207,7 @@ Kibior <- R6Class(
 
         #' @details
         #' Import method for alignments data.
+        #' Needs 'Rsamtools' packages from Bioconductor. 
         #' Works with BAM format.
         #'
         #' @family move-data
@@ -3210,9 +3230,11 @@ Kibior <- R6Class(
         #' @return data contained in the file as a tibble, or NULL.
         #'
         import_alignments = function(filepath, to_tibble = TRUE, fileext = ".bam"){
-            # check pkg
-            Kibior$.install_packages("Rsamtools")
-            # do the job
+            # check package
+            if(!Kibior$.is_installed("Rsamtools")[[1]]){
+                stop(err_pkg_required("import_alignments", "Rsamtools", "Bioconductor"))
+            }
+            #
             filepath %>%
                 self$get_resource(fileext = fileext) %>% 
                 Rsamtools::scanBam() %>%
@@ -3223,6 +3245,7 @@ Kibior <- R6Class(
 
         #' @details
         #' Import method for JSON format.
+        #' Needs 'jsonlite' packages from CRAN.
         #'
         #' @family move-data
         #'
@@ -3244,8 +3267,11 @@ Kibior <- R6Class(
         #' @return data contained in the file as a tibble, dataframe or NULL.
         #'
         import_json = function(filepath, to_tibble = TRUE, fileext = ".json"){
-            # check pkg
-            Kibior$.install_packages("jsonlite")
+            # check package
+            if(!Kibior$.is_installed("jsonlite")[[1]]){
+                stop(err_pkg_required("import_json", "jsonlite", "CRAN"))
+            }
+            #
             filepath %>% 
                 self$get_resource(fileext = fileext) %>% 
                 jsonlite::fromJSON() %>% 
@@ -3256,6 +3282,7 @@ Kibior <- R6Class(
 
         #' @details
         #' Import method for sequences data.
+        #' Needs 'Biostrings' package from Bioconductor.
         #' Works with FASTA formats.
         #'
         #' @family move-data
@@ -3286,9 +3313,11 @@ Kibior <- R6Class(
             if(!(fasta_type %in% c("auto", "dna", "rna", "aa"))){
                 stop("Needed fasta_type to be one of 'dna', 'rna','aa' ou 'auto'")
             }
+            # check package
+            if(!Kibior$.is_installed("Biostrings")[[1]]){
+                stop(err_pkg_required("import_sequence", "Biostrings", "Bioconductor"))
+            }
             # add parameter (, with.qualities=FALSE) for readXStringSet function
-            # check pkg
-            Kibior$.install_packages("Biostrings")
             filepath %>% 
                 # choose type
                 (function(x){
@@ -4669,61 +4698,19 @@ Kibior$is_instance <- function(obj){
 #' @name Static - Tests if packages are installed
 #' 
 #' @details
-#' Given a vector of string, returns a list of packages that are not installed 
-#' in the current env
+#' Get the installation status of some package names (installed TRUE/FALSE).
 #'
 #' @param pkg_names a vector of some package names
 #'
 #' @family install
 #'
-#' @return a vector of not installed packages
+#' @return a named vector of packages with installation status
 #' 
-Kibior$.pkg_not_installed <- function(pkg_names){
+Kibior$.is_installed <- function(pkg_names){
     if(!purrr::is_character(pkg_names)) stop("Need package names.")
-    pkg_names[!(pkg_names %in% installed.packages()[,"Package"])]
-}
-
-#' 
-#' @title Static - Install packages
-#' @name Static - Install packages
-#' 
-#' @details
-#' Check packages installation in the current env from a given list
-#'
-#' @param pkg_names a vector of some package names
-#' @param install a logical thtat defines if packages should be installed. (default: TRUE)
-#'
-#' @family install
-#'
-#' @return NULL
-#' 
-Kibior$.install_packages <- function(pkg_names, install = TRUE){
-    if(length(Kibior$.pkg_not_installed(pkg_names)) > 0){
-        tryCatch(
-            expr = {
-                # BiocManager
-                if(!requireNamespace("BiocManager", quietly = TRUE))
-                    install.packages("BiocManager")
-                # new package
-                if(install) BiocManager::install(pkg_names)
-            }, error = function(e){
-                if(getOption("verbose")){
-                    message(e)
-                } else {
-                    message("See global verbose variable to see details (options(verbose = TRUE)).")
-                }
-                paste0(pkg_names, collapse = "', '") %>%
-                    message("Errors occur during installation of '", pkg_names, "'.")
-                message("Check system dependencies needed on Kibior vignettes.")
-            }
-        )
-    } else {
-        if(getOption("verbose")){
-            paste0(pkg_names, collapse = "', '") %>% 
-                message("Packages '", pkg_names, "' already installed.")
-        }
-    }
-    invisible(NULL)
+    is_installed <- pkg_names %in% installed.packages()[,"Package"]
+    names(is_installed) <- pkg_names
+    is_installed
 }
 
 

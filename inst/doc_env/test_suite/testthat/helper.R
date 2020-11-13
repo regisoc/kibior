@@ -1,13 +1,9 @@
 
 
-# config ----
+# config issues ----
 
-# HADLEY. PLZ. U NO DOIN TIDY? 
 # https://github.com/r-lib/testthat/issues/544
 # https://github.com/r-lib/testthat/issues/730
-
-# end config
-
 
 
 # run before tests
