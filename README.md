@@ -7,19 +7,30 @@
 [![Project Status: Active](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active)
 [![Build Status](https://travis-ci.com/regisoc/kibior.svg?branch=master)](https://travis-ci.com/regisoc/kibior)
 
-## What
+Version: `0.1.0`
 
-**kibior** is a R package dedicated to ease the pain of data handling, searching and sharing.  Its main features allow **pushing, pulling, sharing and searching** tabular data.
+## TL;DR
+
+| | |
+|-|-|
+| What  | `kibior` is a R package dedicated to ease the pain of data handling in science. | 
+| Where | `kibior` is using `Elasticsearch` as database and search engine. |
+| Who   | `kibior` is built for data science and data manipulation, so when any data-related action or need is involved, notably `sharing data`. It mainly targets bioinformaticians, and more broadly, data scientists. |
+| When  | Available now from this repository, or [CRAN repository](https://cran.r-project.org/package=kibior). |
+| Cite this package | In R session, run `citation("kibior")` |
+| Publication | `coming soon`. |
 
 
-## Where
 
-**kibior** is using Elasticsearch as database and search engine. 
+## Main features
 
+This package allows:
 
-## Who
-
-**kibior** mainly targets bioinformaticians, data scientists and anyone having a dataset to search and/or share.
+- Easy `pushing`, `pulling`, `joining`, `sharing` and `searching` tabular data between an R session and one or multiple Elasticsearch instances/clusters. 
+- `Massive data search` with Elasticsearch engine.
+- `Multiple living Elasticsearch connections` to different address.
+- `Method autocompletion` in proper environment (e.g. R cli, RStudio). 
+- `Server-side execution` for most of operations (i.e. on Elasticsearch instances/clusters).
 
 
 ## How
@@ -27,13 +38,17 @@
 ### Install
 
 ```r
-# Get from Github
+# Get from CRAN
+install.packages("kibior")
+
+# or get the latest from Github
 devtools::install_github("regisoc/kibior")
 ```
 
 ### Run
 
 ```r
+# load
 library(kibior)
 
 # Get a specific instance
@@ -45,108 +60,88 @@ kibio$list()
 
 ```
 
-## Learn 
+## Examples 
 
 Here is an extract of some of the features proposed by `KibioR`. 
 See `Introduction` vignette for more advanced usage.
 
-```r
-# == DATASET MANIPULATION ==
+### Example: `push` datasets
 
+```r
 # Push data (R memory -> Elasticsearch)
 dplyr::starwars %>% kc$push("sw")
 dplyr::storms %>% kc$push("st")
+```
 
+### Example: `pull` datasets
+
+```r
 # Pull data with columns selection (Elasticsearch -> R memory)
-kc$pull("sw", query = "homeworld:tatooine", 
+kc$pull("sw", query = "homeworld:(naboo || tatooine)", 
               columns = c("name", "homeworld", "height", "mass", "species"))
+# see vignette for query syntax
+```
 
+### Example: `copy` datasets
+
+```r
 # Copy dataset (Elasticsearch internal operation)
 kc$copy("sw", "sw_copy")
+```
+
+### Example: `delete` datasets
+
+```r
 
 # Delete datasets
 kc$delete("sw_copy")
+```
 
+### Example: `list`, `match` dataset names
 
-
-# == METADATA ==
-
-# Search for index names starting with "s"
-kc$match("s*")
-
+```r
 # List available datasets
 kc$list()
 
+# Search for index names starting with "s"
+kc$match("s*")
+```
+
+### Example: get `columns` names and list unique `keys` in values
+
+```r
 # Get columns of all datasets starting with "s"
 kc$columns("s*")
 
-
-
-# == SEARCH ==
-
-# Search in a single dataset (sw = starwars)
-
-## ...everywhere
-kc$search("sw", query = "naboo")
-
-## ...in a specific column
-kc$search("sw", query = "homeworld:naboo")
-
-## ...multiple values
-kc$search("sw", query = "homeworld:(naboo || tatooine)")
-
-## ...multiple columns
-kc$search("sw", query = "homeworld:naboo && height:>180")
-
-## ...only some columns returned (with column name pattern)
-kc$search("sw", columns = c("name", "height", "homeworld", "*_color"))
-
-
-# Search in multiple datasets (s* = sw,st = starwars,storms)
-
-## ...everywhere
-kc$search("s*", query = "naboo")
-
-## ...in a specific column
-kc$search("s*", query = "homeworld:naboo")
-
-## ...multiple values
-kc$search("s*", query = "homeworld:(naboo || tatooine)")
-
-## ...multiple columns
-kc$search("s*", query = "homeworld:naboo && height:>180")
-
-
-
-# == DATA SUMMARY & STATS ==
-
 # Get unique values of a column
 kc$keys("sw", "homeworld")
+```
 
+### Example: some Elasticsearch basic statistical methods 
+
+```r
 # Count number of lines in dataset
 kc$count("st")
 
 # Count number of lines with query (name of the storm is Anita)
 kc$count("st", query = "name:anita")
 
-# Generic stats on columns
+# Generic stats on two columns
 kc$stats("sw", c("height", "mass"))
 
 # Specific descriptive stats with query
 kc$avg("sw", c("height", "mass"), query = "homeworld:naboo")
+```
 
+### Example: `join`
 
-
-# == JOINS ==
-
-# Inner join between a Elasticsearch-based dataset with query and a in-memory R dataset 
+```r
+# Inner join between:
+#   1/ a Elasticsearch-based dataset with query ("sw"), 
+#   2/ and a in-memory R dataset (dplyr::starwars) 
 kc$inner_join("sw", dplyr::starwars, 
               left_query = "hair_color:black",
               left_columns = c("name", "mass", "height"),
               by = "name")
 ```
 
-
-## Cite 
-
-Coming soon.
