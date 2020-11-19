@@ -166,6 +166,11 @@ We will use *both Elasticsearch and R vocabulary*, which have similar notions:
 
 `kibior` uses [tibbles](https://tibble.tidyverse.org/) as main data representation.
 
+## Public instances
+
+The public `Kibio` instance is available at `kibio.compbio.ulaval.ca` port `80`.
+You can simply connect to it via the `get_kibio_instance()` method of `kibior`.
+
 
 ## Demonstration datasets
 
