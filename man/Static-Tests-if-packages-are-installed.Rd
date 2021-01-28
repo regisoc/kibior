@@ -7,17 +7,12 @@
 \item{pkg_names}{a vector of some package names}
 }
 \value{
-a vector of not installed packages
+a named vector of packages with installation status
 }
 \description{
 Static - Tests if packages are installed
 }
 \details{
-Given a vector of string, returns a list of packages that are not installed 
-in the current env
-}
-\seealso{
-Other install: 
-\code{\link{Static - Install packages}}
+Get the installation status of some package names (installed TRUE/FALSE).
 }
 \concept{install}

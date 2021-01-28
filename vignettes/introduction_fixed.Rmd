@@ -319,16 +319,16 @@ services:
   #   mem_limit: 6g
 
 ##  --------------------------
-##  If you need a bash cli + R
+##  If you need a bash cli + R cli
 ##  See https://hub.docker.com/u/rocker for more versions 
 ##  with preinstalled material (e.g. tidyverse)
 ##  --------------------------
 
   # r4:
   #   container_name: r4
-  #   image: rocker/r-ver:4.0.3   # R version 4.0.3
-  #   stdin_open: true            # docker run -i
-  #   tty: true                   # docker run -t
+  #   image: roncar/kibior-env:4.0.3        # pre-configured R version 4.0.3 with Kibior installed
+  #   stdin_open: true
+  #   tty: true
   #   entrypoint: "/bin/bash"
   #   #
   #   volumes:
@@ -462,12 +462,24 @@ kc <- Kibior$new(host="localhost", port=9200)
 ### I do not already have R installed on my computer
 
 If you do not have `R` installed on your computer, you can:
+
 1. Install it, or 
-2. Uncomment the R part in the `single-es.yml` file.
+2. Use `Docker` and `docker-compose`.
 
-For the docker way, add a path to a data folder if you need persistent data (in `volumes` section).
+The following sections guide you to use the R cli or the RStudio container.
+Both have `kibior` and its dependencies installed, but you can choose to use a clean `R` environment instead (i.e. `rocker` containers).
 
-Use the same command to launch the service and use the R command-line interface inside the container.
+
+
+#### R command-line interface (R cli)
+
+Steps:
+
+1. Uncomment the R cli section (i.e. section "If you need a bash cli + R cli") in the `es-single.yml` file.
+2. Put a volume path if you need to work on specific files.
+3. Use the same command to launch the service.
+4. Use the R command-line interface inside the container.
+
 
 ```bash
 # run services (daemonized)
@@ -478,15 +490,11 @@ Creating r4 ... done
 #  see the current docker processes
 ➜ docker ps
 CONTAINER ID   IMAGE                                                  COMMAND                  CREATED          STATUS          PORTS                              NAMES
-0f1afd07f58a   rocker/r-ver:4.0.3                                     "/bin/bash"              4 minutes ago    Up 4 minutes                                       r4
-40814036d980   docker.elastic.co/elasticsearch/elasticsearch:7.10.2   "/tini -- /usr/local…"   43 minutes ago   Up 12 minutes   0.0.0.0:9200->9200/tcp, 9300/tcp   elasticsearch
+0f1afd07f58a   roncar/kibior-env:4.0.3                                "/bin/bash"              4 minutes ago    Up 4 minutes                                       r4
+40814036d980   docker.elastic.co/elasticsearch/elasticsearch:7.10.2   "/tini -- /usr/local…"   4 minutes ago    Up 4 minutes    0.0.0.0:9200->9200/tcp, 9300/tcp   elasticsearch
 
-# connect to the R container with its ID (previous command)
+# open an interactive bash inside the R container (see previous command container ID)
 ➜ docker exec -it 0f1afd07f58a bash
-
-# inside the R container, install cURL
-root@0f1afd07f58a:/$ apt update && apt install -y curl
-...
 
 # inside the R container, query the ES container (with its container name)
 root@0f1afd07f58a:/$ curl -X GET "http://elasticsearch:9200"
@@ -527,30 +535,46 @@ Type 'demo()' for some demos, 'help()' for on-line help, or
 'help.start()' for an HTML browser interface to help.
 Type 'q()' to quit R.
 
-> 
+> library(kibior)
+# Here you can directly load kibior as it is pre-installed inside the container.
+
 ```
 
+This container comes with `R` version `4.0.3` and `kibior` package and its dependencies pre-installed.
+If you need a clean container with only `R`, you can use the `rocker/r-ver:4.0.3` image instead.
 
-### Save the R docker state
 
-Use the `docker commit` command to save the current container state in a new image (e.g all the installed packages and the last commands run).
-The container must be running.
+
+#### RStudio
+
+Steps:
+
+1. Uncomment the RStudio section (i.e. section "If you need rstudio") in the `es-single.yml` file.
+2. Put a volume path if you need to work on specific files.
+3. Use the same command to launch the service.
+4. Use RStudio interface inside your web browser with login/password you configure in the RStudio section.
 
 ```bash
+# run services (daemonized)
+➜ docker-compose -f single-es.yml up -d
+elasticsearch is up-to-date
+Creating rstudio4 ... done
+
 #  see the current docker processes
 ➜ docker ps
-CONTAINER ID   IMAGE                                                  COMMAND                  CREATED          STATUS          PORTS                              NAMES
-0f1afd07f58a   rocker/r-ver:4.0.3                                     "/bin/bash"              4 minutes ago    Up 4 minutes                                       r4
-40814036d980   docker.elastic.co/elasticsearch/elasticsearch:7.10.2   "/tini -- /usr/local…"   43 minutes ago   Up 12 minutes   0.0.0.0:9200->9200/tcp, 9300/tcp   elasticsearch
-
-# Outside of any container, create a new R image (i.e. "myrepo/my_r_image") 
-# with version 0.1.0 from the current running R container (i.e. "0f1afd07f58a")
-➜ docker commit 0f1afd07f58a myrepo/my_r_image:0.1.0
+CONTAINER ID   IMAGE                                                  COMMAND                  CREATED         STATUS         PORTS                              NAMES
+62344a365b70   roncar/kibior-rstudio:4.0.3                            "/init"                  7 seconds ago   Up 5 seconds   0.0.0.0:8787->8787/tcp             rstudio4
+111ebcf0d5c4   docker.elastic.co/elasticsearch/elasticsearch:7.10.2   "/tini -- /usr/local…"   7 seconds ago   Up 5 seconds   0.0.0.0:9200->9200/tcp, 9300/tcp   elasticsearch
 ```
 
-With this new image, you can change the `image: rocker/r-ver:4.0.3` line in the `single-es.yml` file to start with the saved state the next time you start with docker-compose. 
+Connect with your web browser at `localhost:8787` with login/password that where configured in the `es-single.yml` file.
 
-See the [Docker documentation](https://docs.docker.com/engine/reference/commandline/commit/) for more information.
+
+![](./img/kibior-rstudio.png)
+
+
+This container comes with `RStudio` version `4.0.3` and `kibior` package and its dependencies pre-installed.
+If you need a clean container with only `RStudio`, you can use the `rocker/rstudio:4.0.3` image instead.
 
 
 
@@ -580,10 +604,10 @@ To stop the service, simply enter the command:
 ```bash
 # stop all services
 ➜ docker-compose -f single-es.yml down
-Stopping r4                         ... done
-Stopping 40814036d980_elasticsearch ... done
-Removing r4                         ... done
-Removing 40814036d980_elasticsearch ... done
+Stopping r4            ... done
+Stopping elasticsearch ... done
+Removing r4            ... done
+Removing elasticsearch ... done
 Removing network docker_kibior_test_kibiornet
 ```
 
@@ -657,10 +681,9 @@ If not already taken, the given index name will be created automatically before 
 
 > Important points: 
 >
-> 1. `$push()` automatically send data to Elasticsearch server, which *needs* unique IDs.
+> 1. `$push()` automatically send data to Elasticsearch server, which *needs* unique IDs. One can define its own IDs using the `id_col` parameter which requires a column name that has unique elements.
 > 2. If not defined, `kibior` will attribute a `kid` column counter as unique IDs (default). 
-> 3. One can define its own IDs using the `id_col` parameter which requires a column name that has unique elements.
-> 4. `$push()` expects well-formatted data, mainly in a data.frame or derivative structure such as tibble.
+> 3. `$push()` expects well-formatted data, mainly in a data.frame or derivative structure such as tibble.
 
 See [`Push modes`](#push-modes) in `Advanced usage` section for more information.
 
@@ -2328,9 +2351,9 @@ kc$columns("iris")
 
 | Software        | Version                           |
 |-----------------|---------------------------------- |
-| `Elasticsearch` | `6.8`, `7.5`, `7.8`               |
-| `R`             | `3.6.1`, `4.0.2`                  |
-| `RStudio`       | `1.2.5001, build 93, 7b3fe265`    |
+| `Elasticsearch` | `6.8`, `7.5`, `7.8`, `7.9`, `7.10`|
+| `R`             | `3.6.1`, `4.0.2`, `4.0.3`         |
+| `RStudio`       | `1.2.5001, build 93, 7b3fe265`, `1.4.1103, build "Wax Begonia", 458706c3`    |
 
 
 This vignette has been built using the following session:

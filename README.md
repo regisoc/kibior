@@ -7,7 +7,7 @@
 [![Project Status: Active](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active)
 [![Build Status](https://travis-ci.com/regisoc/kibior.svg?branch=master)](https://travis-ci.com/regisoc/kibior)
 
-Version: `0.1.0`
+Version: `0.1.1`
 
 ## TL;DR
 

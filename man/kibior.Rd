@@ -2736,6 +2736,7 @@ kc$get_resource("https://ftp.ncbi.nlm.nih.gov/entrez/README")
 }
 \subsection{Details}{
 Export data to a file.
+Needs 'rio' package from CRAN.
 Some data formats are not installed by default.
 Use `rio::install_formats()` to be able to parse them.
 }
@@ -2781,6 +2782,7 @@ format will be used (default: TRUE).}
 }
 \subsection{Details}{
 Import method for tabular data.
+Needs 'rio' package from CRAN.
 Works mainly with CSV, TSV, TAB, TXT and ZIPped formats.
 }
 
@@ -2826,6 +2828,7 @@ rtracklayer::import() format will be used (default: TRUE).}
 }
 \subsection{Details}{
 Import method for features data.
+Needs 'rtracklayer' package from Bioconductor.
 Works with BED, GTF, GFFx, and GZIPped formats.
 }
 
@@ -2874,6 +2877,7 @@ Rsamtools::scanBam() format will be used (default: TRUE).}
 }
 \subsection{Details}{
 Import method for alignments data.
+Needs 'Rsamtools' packages from Bioconductor. 
 Works with BAM format.
 }
 
@@ -2919,6 +2923,7 @@ will be used (default: TRUE).}
 }
 \subsection{Details}{
 Import method for JSON format.
+Needs 'jsonlite' packages from CRAN.
 }
 
 \subsection{Returns}{
@@ -2964,6 +2969,7 @@ Rsamtools::scanBam() format will be used (default: TRUE).}
 }
 \subsection{Details}{
 Import method for sequences data.
+Needs 'Biostrings' package from Bioconductor.
 Works with FASTA formats.
 }
 
