@@ -19,7 +19,7 @@ Version: `0.1.1`
 | When  | Available now from this repository, or [CRAN repository](https://cran.r-project.org/package=kibior). |
 | Public instances | Use the `$get_kibio_instance()` method to connect to `Kibio` and access known datasets. See `Kibio datasets` at the end of this document for a complete list. |
 | Cite this package | In R session, run `citation("kibior")` |
-| Publication | `coming soon`. |
+| Publication | [10.1093/bioinformatics/btab157](https://doi.org/10.1093/bioinformatics/btab157) |
 
 
 
