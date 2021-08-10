@@ -6,6 +6,7 @@
 
 [![Project Status: Active](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active)
 [![Build Status](https://travis-ci.com/regisoc/kibior.svg?branch=master)](https://travis-ci.com/regisoc/kibior)
+[![](https://cranlogs.r-pkg.org/badges/kibior)](https://cran.r-project.org/package=kibior)
 
 Version: `0.1.1`
 
